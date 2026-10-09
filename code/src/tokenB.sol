@@ -32,7 +32,7 @@ contract TokenB is ERC20, ERC20Permit, Ownable {
     uint256 public constant FAUCET_COOLDOWN = 1 days;
 
     /// @notice Timestamp (unix seconds) of the last faucet claim per address; 0 if never claimed.
-    mapping (address => uint256) public lastFaucetClaim;
+    mapping(address => uint256) public lastFaucetClaim;
 
     /// @notice Emitted when an address receives tokens from the faucet.
     event FaucetClaimed(address indexed recipient, uint256 amount);
@@ -42,9 +42,7 @@ contract TokenB is ERC20, ERC20Permit, Ownable {
      * @param initialSupply Total tokens minted to the deployer (wei units, 18 decimals).
      *                      Example: pass 1_000_000 * 10**18 for 1,000,000 R2B.
      */
-    constructor(uint256 initialSupply) 
-    ERC20("Ra2techB", "R2B") ERC20Permit("Ra2techB") Ownable(msg.sender) 
-    {
+    constructor(uint256 initialSupply) ERC20("Ra2techB", "R2B") ERC20Permit("Ra2techB") Ownable(msg.sender) {
         _mint(msg.sender, initialSupply);
     }
 

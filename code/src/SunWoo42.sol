@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 // Ownable provides access control, allowing only the owner to perform certain actions
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-
 /**
  * @title SunWoo42
  * @notice Test ERC-20 token used as Token A of the TokenZswap AMM pool.
@@ -31,7 +30,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  *     eliminating the need for a separate on-chain approve transaction.
  */
 contract SunWoo42 is ERC20, ERC20Permit, Ownable {
-
     /// @notice Amount of tokens dispensed by the faucet (in wei units, 18 decimals).
     uint256 public constant FAUCET_AMOUNT = 1_000 * 10 ** 18;
 
@@ -50,10 +48,11 @@ contract SunWoo42 is ERC20, ERC20Permit, Ownable {
      *                      Example: pass 1_000_000 * 10**18 for 1,000,000 SW42.
      */
 
-    constructor(uint256 initialSupply) 
+    constructor(uint256 initialSupply)
         ERC20("SunWoo42", "SW42") // token name and ticker symbol
         ERC20Permit("SunWoo42") // domain separator for EIP-2612
         Ownable(msg.sender) // sets the deployer as the initial owner
+
     {
         _mint(msg.sender, initialSupply);
     }
