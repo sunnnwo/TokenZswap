@@ -6,7 +6,7 @@ solc_version = "0.8.28"
 remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
 ]
-
+fs_permissions = [{ access = "read-write", path = "../deployment" }]
 [rpc_endpoints]
 bsc_testnet = "${BSC_TESTNET_RPC_URL}"
 sepolia     = "${SEPOLIA_RPC_URL}"
