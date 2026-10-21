@@ -10,6 +10,12 @@ export const ADDRESSES: Record<number, Deployment> = {
     tokenB: '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512',
     nft: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9',
   },
+    97: {
+    amm: '0x0a1134046cECA785a218A92376fdb542cB9ACA52',
+    tokenA: '0x3b9D1ecef6f5c137343A6C49D4a8f2447FAbaB10',
+    tokenB: '0x6CF255a2E7c5ec40D5CD36db887359d290E20A4d',
+    nft: '0x7DA2B6BC5330ad801427E6879201b079A774aB15',
+  },
 }
 
 /** AMM에서 지금 읽을 함수들만 (나중에 swap 등을 추가한다) */

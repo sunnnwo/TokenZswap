@@ -34,7 +34,7 @@ contract SunWoo42 is ERC20, ERC20Permit, Ownable {
     uint256 public constant FAUCET_AMOUNT = 1_000 * 10 ** 18;
 
     /// @notice Cooldown period between faucet claims (in seconds).
-    uint256 public constant FAUCET_COOLDOWN = 86400;
+    uint256 public constant FAUCET_COOLDOWN = 1 days;
 
     /// @notice Timestamp (unix seconds) of the last faucet claim per address; 0 if never claimed.
     mapping(address => uint256) public lastFaucetClaim;
@@ -62,9 +62,7 @@ contract SunWoo42 is ERC20, ERC20Permit, Ownable {
      */
 
     function faucet() external {
-        require(
-            block.timestamp >= lastFaucetClaim[msg.sender] + FAUCET_COOLDOWN, "Faucet: cooldown period not yet passed"
-        );
+        require(block.timestamp >= lastFaucetClaim[msg.sender] + FAUCET_COOLDOWN, "Faucet cooldown: 1 day");
         lastFaucetClaim[msg.sender] = block.timestamp;
         _mint(msg.sender, FAUCET_AMOUNT);
         emit FaucetClaimed(msg.sender, FAUCET_AMOUNT);
