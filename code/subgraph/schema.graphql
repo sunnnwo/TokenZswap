@@ -1,0 +1,62 @@
+"""풀 (우리 AMM은 풀이 1개). id = AMM 컨트랙트 주소"""
+type Pool @entity(immutable: false) {
+  id: Bytes!
+  tokenA: Bytes! # Swap 이벤트의 tokenIn이 A인지 B인지 구분할 때 사용
+  tokenB: Bytes!
+  reserveA: BigInt!
+  reserveB: BigInt!
+  totalLiquidity: BigInt! # LP 총량
+  swapCount: BigInt!
+}
+
+"""swap 1번 = 1줄. id = tx 해시 + 로그 번호"""
+type Swap @entity(immutable: true) {
+  id: Bytes!
+  trader: Bytes!
+  tokenIn: Bytes!
+  amountIn: BigInt!
+  amountOut: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+enum LiquidityType {
+  ADD
+  REMOVE
+}
+
+"""유동성 공급/회수 1번 = 1줄. id = tx 해시 + 로그 번호"""
+type LiquidityEvent @entity(immutable: true) {
+  id: Bytes!
+  type: LiquidityType!
+  provider: Bytes!
+  amountA: BigInt!
+  amountB: BigInt!
+  liquidity: BigInt!
+  timestamp: BigInt!
+}
+
+enum ListingStatus {
+  ACTIVE
+  SOLD
+  CANCELLED
+}
+
+"""판매 건. id = listingId ("0", "1", …)"""
+type Listing @entity(immutable: false) {
+  id: ID!
+  seller: Bytes!
+  nft: Bytes!
+  tokenId: BigInt!
+  paymentToken: Bytes!
+  price: BigInt!
+  status: ListingStatus!
+  buyer: Bytes # 팔린 건에만 있음 (판매 중이거나 취소된 건은 null)
+  createdAt: BigInt!
+}
+
+"""NFT 1개. id = tokenId ("0", "1", "2")"""
+type Nft @entity(immutable: false) {
+  id: ID!
+  owner: Bytes!
+}
