@@ -19,8 +19,29 @@ export const ammAbi = parseAbi([
   'function totalSupply() view returns (uint256)', // [1] LP 토큰 총발행량. AMM은 ERC20을 상속했으니 ERC20 표준 함수 이름
   'function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) pure returns (uint256)',
   'function swap(address tokenIn, uint256 amountIn, uint256 minAmountOut) returns (uint256 )',
+  'function addLiquidity(uint256 amountA, uint256 amountB) returns (uint256 liquidity)',
+  'function removeLiquidity(uint256 lpAmount) returns (uint256 amountA, uint256 amountB)',
+  'function listNFT(address nft, uint256 tokenId, uint256 price, address paymentToken) returns (uint256 listingId)',
+  'function nextListingId() view returns (uint256)',
+  'function listings(uint256 listingId) view returns (address seller, address nft, uint256 tokenId, uint256 price, address paymentToken, bool active)',
+  'function cancelListing(uint256 listingId)',
+  'function buyNFT(uint256 listingId)',
 ])
 
+/** TokenizerArt (ERC-721) */
+export const nftAbi = parseAbi([
+    'function ownerOf(uint256 tokenId) view returns (address)',
+    'function balanceOf(address owner) view returns (uint256)',
+    'function tokenURI(uint256 tokenId) view returns (string)',
+    'function getApproved(uint256 tokenId) view returns (address)', // N2
+    'function approve(address to, uint256 tokenId)', // N2
+])
+
+export function ipfsToHttp(ipfsUri: string): string {
+    if (ipfsUri.startsWith('ipfs://')) {
+return ipfsUri.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')    }
+    return ipfsUri
+}   
 
 /** SW42 / R2B 공통 (둘 다 ERC20 + faucet). AMM의 LP 토큰도 ERC20이라 balanceOf는 이걸로 읽을 수 있다. */
 export const tokenAbi = parseAbi([
