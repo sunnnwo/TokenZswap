@@ -1,0 +1,29 @@
+# Documentation / 문서
+
+## English
+
+| Document | Content |
+|---|---|
+| [architecture.md](architecture.md) | System diagram, every contract and function, design choices, main flows, events, frontend components |
+| [known-limitations.md](known-limitations.md) | Known limitations of the pool, marketplace, tokens, frontend and deployment, with possible fixes |
+| [subgraph.md](subgraph.md) | Entities, event handlers, verification against the chain, build and deploy, example queries |
+
+## 한국어
+
+| 문서 | 내용 |
+|---|---|
+| [architecture.ko.md](architecture.ko.md) | 전체 구조 그림, 컨트랙트와 함수, 설계 선택, 주요 흐름, 이벤트, 프론트 컴포넌트 |
+| [known-limitations.ko.md](known-limitations.ko.md) | 풀, 마켓, 토큰, 프론트, 배포의 알려진 한계와 개선 방법 |
+| [subgraph.ko.md](subgraph.ko.md) | 엔티티, 이벤트 핸들러, 체인과 대조, 빌드와 배포, 쿼리 예시 |
+
+### 학습 자료 (한국어)
+
+| 문서 | 내용 |
+|---|---|
+| [amm-math.md](amm-math.md) | AMM 공식 네 개를 쉬운 숫자로 |
+| [swap-trace.md](swap-trace.md) | swap 한 번의 인자, 내부 변수, storage 변화를 실제 실행 값으로 추적 |
+| [test-walkthrough.md](test-walkthrough.md) | 부분 출금 테스트를 한 줄씩 |
+| [test-guide.pdf](test-guide.pdf) | 테스트 코드 전체 해설 |
+| [erc20-guide.pdf](erc20-guide.pdf) | SW42 / R2B와 OpenZeppelin ERC-20 내부, 단위 계산 |
+| [nft-guide.pdf](nft-guide.pdf) | ERC-721, IPFS, 마켓플레이스, 프론트엔드 연결 |
+| [subgraph-guide.pdf](subgraph-guide.pdf) | 서브그래프 개념, 스키마, 매니페스트, 매핑, 배포와 검증 |
