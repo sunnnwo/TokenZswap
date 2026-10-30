@@ -32,3 +32,4 @@
 | [erc20-guide.pdf](erc20-guide.pdf) | SW42 / R2B와 OpenZeppelin ERC-20 내부, 단위 계산 |
 | [nft-guide.pdf](nft-guide.pdf) | ERC-721, IPFS, 마켓플레이스, 프론트엔드 연결 |
 | [subgraph-guide.pdf](subgraph-guide.pdf) | 서브그래프 개념, 스키마, 매니페스트, 매핑, 배포와 검증 |
+| [cache-server-guide.pdf](cache-server-guide.pdf) | PostgreSQL 준비, 캐시 서버 코드, Explorer, SSH 터널, systemd, nginx, 방화벽, 업데이트 흐름 (그림 15개) |
