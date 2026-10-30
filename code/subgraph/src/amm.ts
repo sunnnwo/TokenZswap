@@ -3,21 +3,21 @@ import {
   AMM,
   LiquidityAdded,
   LiquidityRemoved,
-  Swap as SwapEvent, // 이벤트 Swap과 엔티티 Swap의 이름이 같아서 이벤트 쪽 이름을 바꿈
+  Swap as SwapEvent, // Renamed because the Swap event and the Swap entity share a name
   NFTListed,
   NFTListingCancelled,
   NFTSold,
 } from '../generated/AMM/AMM'
 import { Pool, Swap, LiquidityEvent, Listing } from '../generated/schema'
 
-/** Pool을 불러오고, 없으면 처음 한 번 만든다 */
+/** Load the Pool, creating it once if it does not exist yet */
 function getPool(address: Address): Pool {
   let pool = Pool.load(address)
   if (pool == null) {
     pool = new Pool(address)
-    const amm = AMM.bind(address) // 매핑 안에서 컨트랙트 view 함수 호출
+    const amm = AMM.bind(address) // Call contract view functions from inside the mapping
     pool.tokenA = amm.tokenA()
-    pool.tokenB = amm.tokenB() // [1]
+    pool.tokenB = amm.tokenB()
     pool.reserveA = BigInt.zero()
     pool.reserveB = BigInt.zero()
     pool.totalLiquidity = BigInt.zero()
@@ -30,10 +30,10 @@ export function handleLiquidityAdded(event: LiquidityAdded): void {
   const pool = getPool(event.address)
   pool.reserveA = pool.reserveA.plus(event.params.amountA)
   pool.reserveB = pool.reserveB.plus(event.params.amountB)
-  pool.totalLiquidity = pool.totalLiquidity.plus(event.params.liquidity) // [2]
+  pool.totalLiquidity = pool.totalLiquidity.plus(event.params.liquidity)
   pool.save()
 
-  // 기록 1줄. id = tx 해시 + 로그 번호 (한 tx에 이벤트가 여러 개일 수 있어서)
+  // One record per event. id = tx hash + log index (a tx can emit several events)
   const e = new LiquidityEvent(event.transaction.hash.concatI32(event.logIndex.toI32()))
   e.type = 'ADD'
   e.provider = event.params.provider
@@ -52,7 +52,7 @@ export function handleLiquidityRemoved(event: LiquidityRemoved): void {
   pool.save()
 
   const e = new LiquidityEvent(event.transaction.hash.concatI32(event.logIndex.toI32()))
-  e.type = 'REMOVE' // [3]
+  e.type = 'REMOVE'
   e.provider = event.params.provider
   e.amountA = event.params.amountA
   e.amountB = event.params.amountB
@@ -64,13 +64,13 @@ export function handleLiquidityRemoved(event: LiquidityRemoved): void {
 export function handleSwap(event: SwapEvent): void {
   const pool = getPool(event.address)
   if (event.params.tokenIn.equals(pool.tokenA)) {
-    // A를 넣고 B를 받음
+    // A in, B out
     pool.reserveA = pool.reserveA.plus(event.params.amountIn)
     pool.reserveB = pool.reserveB.minus(event.params.amountOut)
   } else {
-    // B를 넣고 A를 받음
-    pool.reserveB = pool.reserveB.plus(event.params.amountIn) // [4]
-    pool.reserveA = pool.reserveA.minus(event.params.amountOut) // [5]
+    // B in, A out
+    pool.reserveB = pool.reserveB.plus(event.params.amountIn)
+    pool.reserveA = pool.reserveA.minus(event.params.amountOut)
   }
   pool.swapCount = pool.swapCount.plus(BigInt.fromI32(1))
   pool.save()
@@ -86,20 +86,20 @@ export function handleSwap(event: SwapEvent): void {
 }
 
 export function handleNFTListed(event: NFTListed): void {
-  const l = new Listing(event.params.listingId.toString()) // 판매 번호를 문자열 id로
+  const l = new Listing(event.params.listingId.toString()) // Use the listing number as a string id
   l.seller = event.params.seller
   l.nft = event.params.nft
   l.tokenId = event.params.tokenId
   l.paymentToken = event.params.paymentToken
   l.price = event.params.price
-  l.status = 'ACTIVE' // [6]
+  l.status = 'ACTIVE'
   l.createdAt = event.block.timestamp
   l.save()
 }
 
 export function handleNFTListingCancelled(event: NFTListingCancelled): void {
   const l = Listing.load(event.params.listingId.toString())
-  if (l == null) return // 이론상 없지만, 없으면 아무것도 안 함
+  if (l == null) return // Should not happen; do nothing if it does
   l.status = 'CANCELLED'
   l.save()
 }
@@ -108,6 +108,6 @@ export function handleNFTSold(event: NFTSold): void {
   const l = Listing.load(event.params.listingId.toString())
   if (l == null) return
   l.status = 'SOLD'
-  l.buyer = event.params.buyer // [7]
+  l.buyer = event.params.buyer
   l.save()
 }

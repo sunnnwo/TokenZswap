@@ -22,58 +22,58 @@ import Explorer from './explorer.tsx'
 
 
 const SLIPPAGE_BPS = 100n // 1%
-const MAX_NFT_ID = 20 // NFT ID는 0~19까지 존재. 20 이상은 없는 토큰 ID
+const MAX_NFT_ID = 20 // NFT IDs are 0–19; 20 and above do not exist
 
 
 
-/** 지갑 연결 상태를 보여주고, 연결 / 체인 전환 / 연결 해제 버튼을 제공한다. */
+/** Shows wallet connection status with connect / switch chain / disconnect buttons. */
 function WalletBar() {
-  const connection = useConnection()   // 지금 연결 상태 (주소, 체인, status)
-  const connectors = useConnectors()   // config에 등록한 연결 방식 목록 ([injected])
-  const connect = useConnect()         // "연결해 줘" 동작
-  const disconnect = useDisconnect()   // "연결 끊어 줘" 동작
-  const chains = useChains()           // config에 등록한 체인 목록
-  const switchChain = useSwitchChain() // "체인 바꿔 줘" 동작
+  const connection = useConnection()   // current connection (address, chain, status)
+  const connectors = useConnectors()   // connectors registered in config ([injected])
+  const connect = useConnect()         // connect action
+  const disconnect = useDisconnect()   // disconnect action
+  const chains = useChains()           // chains registered in config
+  const switchChain = useSwitchChain() // switch chain action
 
-  // 연결 안 된 상태
-  if (connection.status !== 'connected') {                                     // [1]
+  // Not connected
+  if (connection.status !== 'connected') {
     return (
       <div>
         {connectors.map((connector) => (
           <button
             key={connector.uid}
             disabled={connect.isPending}
-            onClick={() => connect.mutate({ connector })}                       // [2]
+            onClick={() => connect.mutate({ connector })}
           >
-            {connector.name} 연결
+            Connect {connector.name}
           </button>
         ))}
-        {connect.error && <p>연결 실패: {connect.error.message}</p>}
+        {connect.error && <p>Connection failed: {connect.error.message}</p>}
       </div>
     )
   }
 
-  // 연결된 상태
+  // Connected
   return (
     <div>
-      <p>주소: {connection.address}</p>
-      <p>체인: {connection.chain?.name ?? `지원하지 않는 체인 (ID ${connection.chainId})`}</p>
+      <p>Address: {connection.address}</p>
+      <p>Chain: {connection.chain?.name ?? `Unsupported chain (ID ${connection.chainId})`}</p>
 
       {chains.map((chain) => (
         <button
           key={chain.id}
           disabled={chain.id === connection.chainId || switchChain.isPending}
-          onClick={() => switchChain.mutate({ chainId: chain.id })}            // [3]
+          onClick={() => switchChain.mutate({ chainId: chain.id })}
         >
-          {chain.name}로 전환
+          Switch to {chain.name}
         </button>
       ))}
 
-      <button onClick={() => disconnect.mutate()}>연결 해제</button>         {/* [4] */}
+      <button onClick={() => disconnect.mutate()}>Disconnect</button>
     </div>
   )
 }
-/** 풀의 reserveA / reserveB / LP 총량과 현재 가격을 보여준다. */
+/** Shows the pool reserveA / reserveB / LP total supply and current price. */
 function PoolInfo() {
   const connection = useConnection()
   const addresses = ADDRESSES[connection.chainId ?? 0]
@@ -88,21 +88,21 @@ function PoolInfo() {
     ],
     allowFailure: false,
     query : {
-      enabled: !!addresses, // 체인 지원 안 하면 읽기 요청을 보내지 않음
+      enabled: !!addresses, // skip reads on unsupported chains
     }
   })
-  if (!addresses) return <p>이 체인에는 배포된 컨트렉트가 없습니다.</p>
-  if (pool.isPending) return <p>풀 정보 로딩 중...</p>
-  if (pool.isError) return <p>읽기 실패: {pool.error.message}</p>
+  if (!addresses) return <p>No contracts deployed on this chain.</p>
+  if (pool.isPending) return <p>Loading pool info…</p>
+  if (pool.isError) return <p>Read failed: {pool.error.message}</p>
 
   const [reserveA, reserveB, lpSupply] = pool.data
   return (
     <div>
       <h2>Pool</h2>
-      <p>SW42 (A): {formatUnits(reserveA, 18)}</p>      {/* [4] 토큰 소수점 자릿수 */}
+      <p>SW42 (A): {formatUnits(reserveA, 18)}</p>
       <p>R2B (B): {formatUnits(reserveB, 18)}</p>
-      <p>LP 총량: {formatUnits(lpSupply, 18)}</p>
-      <p>가격: 1 A = {Number(formatUnits(reserveB, 18)) / Number(formatUnits(reserveA, 18))} B</p>
+      <p>LP Total Supply: {formatUnits(lpSupply, 18)}</p>
+      <p>Price: 1 A = {Number(formatUnits(reserveB, 18)) / Number(formatUnits(reserveA, 18))} B</p>
     </div>
   )}
 
@@ -116,30 +116,30 @@ const balances = useReadContracts({
     contracts: [
       { address: addresses?.tokenA, abi: tokenAbi, functionName: 'balanceOf', args: [me!] },
       { address: addresses?.tokenB, abi: tokenAbi, functionName: 'balanceOf', args: [me!] },
-      { address: addresses?.amm, abi: tokenAbi, functionName: 'balanceOf', args: [me!] }, // [2] LP 잔액은 어느 컨트랙트에 물어볼까요?
+      { address: addresses?.amm, abi: tokenAbi, functionName: 'balanceOf', args: [me!] }, // LP balance lives in the AMM contract
     ],
     allowFailure: false,
-    query: { enabled: !!addresses && !!me }, // [3] 주소록도 있고 "내 주소"도 있을 때만
+    query: { enabled: !!addresses && !!me }, // only when the chain is supported and a wallet is connected
   })
 
-  const faucet = useWriteContract()                                  // ① 서명 → ② hash
-  const receipt = useWaitForTransactionReceipt({ hash: faucet.data }) // [4] ②에서 받은 hash는 어디에?
+  const faucet = useWriteContract()                                  // sign → tx hash
+  const receipt = useWaitForTransactionReceipt({ hash: faucet.data }) // wait for the tx hash to be mined
 
-  // ③ 채굴되면 캐시를 전부 무효화 → Pool, 잔액이 다시 읽힘
+  // Once mined, invalidate all queries so pool and balances refetch
   useEffect(() => {
     if (receipt.isSuccess) queryClient.invalidateQueries()
   }, [receipt.isSuccess, queryClient])
 
   if (!addresses || !me) return null
-  if (balances.isPending) return <p>잔액 불러오는 중…</p>
-  if (balances.isError) return <p>잔액 읽기 실패: {balances.error.message}</p>
+  if (balances.isPending) return <p>Loading balances…</p>
+  if (balances.isError) return <p>Failed to read balances: {balances.error.message}</p>
 
   const [balA, balB, balLP] = balances.data
-  const busy = faucet.isPending || receipt.isLoading // [5] "서명 대기 중이거나 채굴 대기 중"이면 버튼 잠금
+  const busy = faucet.isPending || receipt.isLoading // disable buttons while waiting for signature or mining
 
   return (
     <section>
-      <h2>내 잔액</h2>
+      <h2>My Balance</h2>
       <p>SW42 (A): {formatUnits(balA, 18)}</p>
       <p>R2B (B): {formatUnits(balB, 18)}</p>
       <p>LP: {formatUnits(balLP, 18)}</p>
@@ -148,24 +148,24 @@ const balances = useReadContracts({
         disabled={busy}
         onClick={() => faucet.mutate({ address: addresses.tokenA, abi: tokenAbi, functionName: 'faucet' })}
       >
-        A 1000개 받기
+        Get 1000 A
       </button>
       <button
         disabled={busy}
         onClick={() => faucet.mutate({ address: addresses.tokenB, abi: tokenAbi, functionName: 'faucet' })}
       >
-        B 1000개 받기
+        Get 1000 B
       </button>
 
-      {receipt.isLoading && <p>채굴 기다리는 중…</p>}
-      {faucet.error && <p>실패: {faucet.error.message}</p>}
+      {receipt.isLoading && <p>Waiting for confirmation…</p>}
+      {faucet.error && <p>Failed: {faucet.error.message}</p>}
     </section>
   )
 }
 
 /**
  * 
- * 입력 문자열 -> wei. 숫자 아니면 0n
+ * Input string -> wei. Returns 0n if not a number
  */
 
 function toWei(text: string):bigint {
@@ -178,7 +178,7 @@ function toWei(text: string):bigint {
 }
 
 /**
- * a <-> b 스왑 (1단계 : 견적)
+ * A <-> B swap: quote, approve, swap
  * 
  */
 
@@ -187,9 +187,9 @@ function Swap()
   const connection = useConnection()
   const addresses = ADDRESSES[connection.chainId ?? 0]
 
-  const [aToB, setAToB] = useState(true) // true면 A->B, false면 B->A
-  const [amountText, setAmountText] = useState('') // 입력 문자열
-  const amountIn = toWei(amountText) // 입력 문자열 -> wei
+  const [aToB, setAToB] = useState(true) // true: A->B, false: B->A
+  const [amountText, setAmountText] = useState('') // input text
+  const amountIn = toWei(amountText) // input text -> wei
 
   const pool = useReadContracts({
     contracts:[
@@ -198,7 +198,7 @@ function Swap()
     ],
     allowFailure: false,
     query : {
-      enabled: !!addresses, // 체인 지원 안 하면 읽기 요청을 보내지 않음
+      enabled: !!addresses, // skip reads on unsupported chains
     }
   })
 
@@ -211,11 +211,11 @@ function Swap()
     functionName: 'getAmountOut',
     args: [amountIn, reserveIn, reserveOut],
     query: {
-      enabled: !!addresses && amountIn > 0n && reserveIn > 0n && reserveOut > 0n, // 견적을 낼 수 있는 조건
+      enabled: !!addresses && amountIn > 0n && reserveIn > 0n && reserveOut > 0n, // only when a quote is possible
     }
   })
   const amountOut = quote.data ?? 0n
-  const minOut = (amountOut *(10_000n - SLIPPAGE_BPS)) / 10_000n // 최소 수령량 = 견적 * (1 - 슬리피지)
+  const minOut = (amountOut *(10_000n - SLIPPAGE_BPS)) / 10_000n // minimum received = quote * (1 - slippage)
 
   const me = connection.address
   const queryClient = useQueryClient()
@@ -227,7 +227,7 @@ function Swap()
     functionName: 'allowance',
     args: me && addresses ? [me, addresses.amm] : undefined,
     query: {
-      enabled: !!addresses && !!me && amountIn > 0n, // "내 주소"도 있고, 입력량도 있을 때만
+      enabled: !!addresses && !!me && amountIn > 0n, // only with a connected wallet
     }
   })
   const needApprove = (allowance.data ?? 0n) < amountIn
@@ -241,7 +241,7 @@ function Swap()
 
   const busy = write.isPending || receipt.isLoading 
 
-  if (!addresses) return <p>이 체인에는 배포된 컨트렉트가 없습니다.</p>
+  if (!addresses) return <p>No contracts deployed on this chain.</p>
   
   const inName = aToB ? 'SW42 (A)' : 'R2B (B)'
   const outName = aToB ? 'R2B (B)' : 'SW42 (A)'
@@ -249,13 +249,13 @@ function Swap()
   return (
     <section>
       <h2>Swap</h2>
-      <button onClick={() => setAToB(!aToB)}>방향 전환</button>
+      <button onClick={() => setAToB(!aToB)}>Switch Direction</button>
       <p>
         {inName} Input: {' '}
         <input value={amountText} onChange={(e) => setAmountText(e.target.value)} placeholder="0.0" />
       </p>
-      <p>{outName} 예상수령 : {formatUnits(amountOut, 18)}</p>
-      <p>최소 수령량 (SLIPPAGE 1%): {formatUnits(minOut, 18)} {outName}</p>
+      <p>{outName} Expected Output: {formatUnits(amountOut, 18)}</p>
+      <p>Minimum Received (1% slippage): {formatUnits(minOut, 18)} {outName}</p>
       {needApprove ? (
         <button
           disabled={busy || amountIn === 0n}
@@ -273,9 +273,9 @@ function Swap()
           Swap
         </button>
       )}
-      {receipt.isLoading && <p>채굴 기다리는 중…</p>}
-      {write.error && <p>서명 실패: {write.error.message}</p>}
-      {receipt.isError && <p>채굴 실패: {receipt.error.message}</p>}
+      {receipt.isLoading && <p>Waiting for confirmation…</p>}
+      {write.error && <p>Transaction failed: {write.error.message}</p>}
+      {receipt.isError && <p>Mining failed: {receipt.error.message}</p>}
     </section>
   )
 }
@@ -288,7 +288,7 @@ function AddLiquidity() {
   const queryClient = useQueryClient()
 
   const [textA, setTextA] = useState('')
-  const [textB, setTextB] = useState('') //첫 공급시에만 사용
+  const [textB, setTextB] = useState('') // only used for the first deposit
   const amountA = toWei(textA)
 
   // Pool state : PoolInfo === "same list" -> same query key -> shared cache
@@ -300,13 +300,13 @@ function AddLiquidity() {
     ],
     allowFailure: false,
     query : {
-      enabled: !!addresses, // 체인 지원 안 하면 읽기 요청을 보내지 않음
+      enabled: !!addresses, // skip reads on unsupported chains
     }
   })
   const [reserveA, reserveB, lpSupply] = pool.data ?? [0n, 0n, 0n]
   const isFirst = lpSupply === 0n
 
-  const amountB = isFirst ? toWei(textB) : (amountA * reserveB) / reserveA //첫 공급시에만 textB를 사용
+  const amountB = isFirst ? toWei(textB) : (amountA * reserveB) / reserveA // textB is only used for the first deposit
   const expectedLP = isFirst ? 0n: (amountA * lpSupply) / reserveA
   
   const allowanceA = useReadContracts({
@@ -315,7 +315,7 @@ function AddLiquidity() {
       { address: addresses?.tokenB, abi: tokenAbi, functionName: 'allowance', args: me && addresses ? [me, addresses.amm] : undefined },
     ],
     allowFailure: false,
-    query: { enabled: !!addresses && !!me  }, // "내 주소"도 있고, 입력량도 있을 때만
+    query: { enabled: !!addresses && !!me  }, // only with a connected wallet
   })
   const [allowA, allowB] = allowanceA.data ?? [0n, 0n]
   const needApproveA = allowA < amountA
@@ -333,18 +333,18 @@ if (!addresses || !me) return null
 
 return (
     <section>
-      <h2>유동성 공급 One day onetime</h2>
+      <h2>Add Liquidity</h2>
       <p>
         SW42 (A): <input value={textA} onChange={(e) => setTextA(e.target.value)} placeholder="0.0" />
       </p>
       {isFirst ? (
         <p>
-          R2B (B): <input value={textB} onChange={(e) => setTextB(e.target.value)} placeholder="0.0" /> (첫 공급: 가격을 직접 정함)
+          R2B (B): <input value={textB} onChange={(e) => setTextB(e.target.value)} placeholder="0.0" /> (first deposit sets the price)
         </p>
       ) : (
-        <p>R2B (B): {formatUnits(amountB, 18)} (풀 비율로 자동 계산)</p>
+        <p>R2B (B): {formatUnits(amountB, 18)} (auto-calculated from pool ratio)</p>
       )}
-      {!isFirst && <p>예상 LP: ≈ {formatUnits(expectedLP, 18)}</p>}
+      {!isFirst && <p>Expected LP: ≈ {formatUnits(expectedLP, 18)}</p>}
 
       {needApproveA ? (
         <button
@@ -356,27 +356,27 @@ return (
       ) : needApproveB ? (
         <button
           disabled={busy || amountB === 0n}
-          onClick={() => write.mutate({ address: addresses.tokenB, abi: tokenAbi, functionName: 'approve', args: [addresses.amm, amountB] })} // [5]
+          onClick={() => write.mutate({ address: addresses.tokenB, abi: tokenAbi, functionName: 'approve', args: [addresses.amm, amountB] })}
         >
           Approve B
         </button>
       ) : (
         <button
           disabled={busy || amountA === 0n || amountB === 0n}
-          onClick={() => write.mutate({ address: addresses.amm, abi: ammAbi, functionName: 'addLiquidity', args: [amountA, amountB] })} // [6]
+          onClick={() => write.mutate({ address: addresses.amm, abi: ammAbi, functionName: 'addLiquidity', args: [amountA, amountB] })}
         >
-          공급
+          Add Liquidity
         </button>
       )}
 
-      {receipt.isLoading && <p>채굴 기다리는 중…</p>}
-      {write.error && <p>실패: {write.error.message}</p>}
+      {receipt.isLoading && <p>Waiting for confirmation…</p>}
+      {write.error && <p>Failed: {write.error.message}</p>}
     </section>
   )
 }
 
 
-/** 유동성 회수: LP 입력(또는 전액) → 받을 A, B 미리보기 → removeLiquidity */
+/** Remove liquidity: enter LP (or Max) → preview A, B received → removeLiquidity */
 function RemoveLiquidity() {
   const connection = useConnection()
   const addresses = ADDRESSES[connection.chainId ?? 0]
@@ -386,7 +386,7 @@ function RemoveLiquidity() {
   const [lpText, setLpText] = useState('')
   const lpAmount = toWei(lpText)
 
-  // 풀 상태 (PoolInfo, AddLiquidity와 같은 목록 → 캐시 공유)
+  // Pool state (same contract list as PoolInfo and AddLiquidity → shared cache)
   const pool = useReadContracts({
     contracts: [
       { address: addresses?.amm, abi: ammAbi, functionName: 'reserveA' },
@@ -398,18 +398,18 @@ function RemoveLiquidity() {
   })
   const [reserveA, reserveB, lpSupply] = pool.data ?? [0n, 0n, 0n]
 
-  // 내 LP 잔액: LP 장부는 AMM 안에 있음
+  // My LP balance: the LP ledger lives in the AMM
   const myLP = useReadContract({
     address: addresses?.amm,
-    abi: tokenAbi, // balanceOf만 쓰니 ERC20 ABI로 충분
+    abi: tokenAbi, // only balanceOf is needed, so the ERC20 ABI is enough
     functionName: 'balanceOf',
     args: me ? [me] : undefined,
     query: { enabled: !!addresses && !!me },
   })
   const myLPAmount = myLP.data ?? 0n
 
-  // 받을 양 = 내 지분 비율 × 풀 잔액 (LP 총량이 0이면 나눗셈 불가)
-  const outA = lpSupply === 0n ? 0n : (lpAmount * reserveA) / lpSupply // [2]
+  // Amount received = my share × pool reserve (skip division when LP supply is 0)
+  const outA = lpSupply === 0n ? 0n : (lpAmount * reserveA) / lpSupply
   const outB = lpSupply === 0n ? 0n : (lpAmount * reserveB) / lpSupply
 
   const write = useWriteContract()
@@ -423,24 +423,24 @@ function RemoveLiquidity() {
 
   return (
     <section>
-      <h2>유동성 회수</h2>
-      <p>내 LP: {formatUnits(myLPAmount, 18)}</p>
+      <h2>Remove Liquidity</h2>
+      <p>My LP: {formatUnits(myLPAmount, 18)}</p>
       <p>
-        회수할 LP: <input value={lpText} onChange={(e) => setLpText(e.target.value)} placeholder="0.0" />
-        <button onClick={() => setLpText(formatUnits(myLPAmount, 18))}>전액</button> {/* [3] */}
+        LP to Remove: <input value={lpText} onChange={(e) => setLpText(e.target.value)} placeholder="0.0" />
+        <button onClick={() => setLpText(formatUnits(myLPAmount, 18))}>Max</button>
       </p>
-      <p>받을 SW42 (A): {formatUnits(outA, 18)}</p>
-      <p>받을 R2B (B): {formatUnits(outB, 18)}</p>
+      <p>SW42 (A) to Receive: {formatUnits(outA, 18)}</p>
+      <p>R2B (B) to Receive: {formatUnits(outB, 18)}</p>
 
       <button
-        disabled={busy || lpAmount === 0n || lpAmount > myLPAmount} // [4] 가진 것보다 많이 빼려 하면 막기
-        onClick={() => write.mutate({ address: addresses.amm, abi: ammAbi, functionName: 'removeLiquidity', args: [lpAmount] })} // [5]
+        disabled={busy || lpAmount === 0n || lpAmount > myLPAmount} // block removing more than I own
+        onClick={() => write.mutate({ address: addresses.amm, abi: ammAbi, functionName: 'removeLiquidity', args: [lpAmount] })}
       >
-        회수
+        Remove
       </button>
 
-      {receipt.isLoading && <p>채굴 기다리는 중…</p>}
-      {write.error && <p>실패: {write.error.message}</p>}
+      {receipt.isLoading && <p>Waiting for confirmation…</p>}
+      {write.error && <p>Failed: {write.error.message}</p>}
     </section>
   )
 }
@@ -450,9 +450,9 @@ function MyNFTs() {
   const addresses = ADDRESSES[connection.chainId ?? 0]
   const me = connection.address
   
-  const tokenIds = Array.from({ length: MAX_NFT_ID }, (_, i) => BigInt(i)) // 0~19까지 NFT ID 배열
+  const tokenIds = Array.from({ length: MAX_NFT_ID }, (_, i) => BigInt(i)) // NFT IDs 0–19
 
-  // NFT 소유 여부를 한 번에 읽기
+  // Read every owner in one batch
   const owners = useReadContracts({
     contracts: tokenIds.map((id) => ({
       address: addresses?.nft,
@@ -460,16 +460,16 @@ function MyNFTs() {
       functionName: 'ownerOf',
       args: [id],
     }) as const),
-    allowFailure: true, // 소유하지 않은 NFT는 ownerOf가 실패하므로 allowFailure 필요
+    allowFailure: true, // ownerOf reverts for nonexistent tokens, so allow failures
     query: { enabled: !!addresses },
   })
 
-  // 소유한 NFT ID만 필터링
+  // Keep only the IDs I own
  const myIds = tokenIds.filter((_, i) => {
     const r = owners.data?.[i]
-    return !!me && r?.status === 'success' && isAddressEqual(r.result, me) // [3]
+    return !!me && r?.status === 'success' && isAddressEqual(r.result, me)
   })
-  // ① tokenURI (모든 NFT가 같은 URI라 첫 번째 것만 읽음)
+  // tokenURI (all NFTs share the same URI, so read only the first)
   const uri = useReadContract({
     address: addresses?.nft,
     abi: nftAbi,
@@ -479,22 +479,22 @@ function MyNFTs() {
   })
 
 
-  // ②③ 메타데이터 JSON 가져오기 (블록체인이 아닌 일반 HTTP → useQuery 직접 사용)
+  // Fetch metadata JSON (plain HTTP, not on-chain → use useQuery directly)
   const metadata = useQuery({
-    queryKey: ['nft-metadata', uri.data], // 캐시 이름표: URI가 같으면 다시 요청 안 함
+    queryKey: ['nft-metadata', uri.data], // cache key: same URI is not refetched
     queryFn: async () => {
       const res = await fetch(ipfsToHttp(uri.data!))
       return (await res.json()) as { name: string; image: string }
     },
-    enabled: !!uri.data, // [4] URI를 읽었을 때만
+    enabled: !!uri.data, // only once the URI is loaded
   })
   if (!addresses || !me) return null
 
   return (
     <section>
-      <h2>내 NFT ({myIds.length}개)</h2>
+      <h2>My NFTs ({myIds.length})</h2>
       {myIds.map((id) => (
-        <div key={id.toString()}> {/* [5] React key는 문자열/숫자만 됨 (bigint 불가) */}
+        <div key={id.toString()}> {/* React keys must be strings or numbers (no bigint) */}
           {metadata.data && <img src={ipfsToHttp(metadata.data.image)} width={120} alt={metadata.data.name} />}
           <p>
             {metadata.data?.name ?? 'NFT'} #{id.toString()}
@@ -502,7 +502,7 @@ function MyNFTs() {
           <p>
             {metadata.data?.name ?? 'NFT'} #{id.toString()}
           </p>
-          <ListNFTForm tokenId={id} /> {/* [6] */}
+          <ListNFTForm tokenId={id} />
         </div>
       ))}
     </section>
@@ -516,7 +516,7 @@ function ListNFTForm( { tokenId } : {tokenId: bigint}) {
   const queryClient = useQueryClient()
 
   const [priceText, setPriceText] = useState('')
-  const [payWithA, setPayWithA] = useState(true) // true : SW42, false면 B
+  const [payWithA, setPayWithA] = useState(true) // true: SW42 (A), false: R2B (B)
   const price = toWei(priceText)
 
   // approve
@@ -541,7 +541,7 @@ if (!addresses) return null
 const paymentToken = payWithA ? addresses.tokenA : addresses.tokenB
 return (
     <div>
-      <input value={priceText} onChange={(e) => setPriceText(e.target.value)} placeholder="가격" />
+      <input value={priceText} onChange={(e) => setPriceText(e.target.value)} placeholder="Price" />
       <select value={payWithA ? 'A' : 'B'} onChange={(e) => setPayWithA(e.target.value === 'A')}>
         <option value="A">SW42 (A)</option>
         <option value="B">R2B (B)</option>
@@ -551,7 +551,7 @@ return (
         <button
           disabled={busy}
           onClick={() =>
-            write.mutate({ address: addresses.nft, abi: nftAbi, functionName: 'approve', args: [addresses.amm, tokenId] }) // [4]
+            write.mutate({ address: addresses.nft, abi: nftAbi, functionName: 'approve', args: [addresses.amm, tokenId] })
           }
         >
           NFT Approve
@@ -564,16 +564,16 @@ return (
               address: addresses.amm,
               abi: ammAbi,
               functionName: 'listNFT',
-              args: [addresses.nft, tokenId, price, paymentToken], // [5]
+              args: [addresses.nft, tokenId, price, paymentToken],
             })
           }
         >
-          판매 등록
+          List for Sale
         </button>
       )}
 
-      {receipt.isLoading && <p>채굴 기다리는 중…</p>}
-      {write.error && <p>실패: {write.error.message}</p>}
+      {receipt.isLoading && <p>Waiting for confirmation…</p>}
+      {write.error && <p>Failed: {write.error.message}</p>}
     </div>
   )
 }
@@ -592,7 +592,7 @@ function Market(){
     functionName: 'nextListingId',
     query: { enabled: !!addresses },
   })
-   // [0n, 1n, …, (n-1)n]  — Array.from의 length는 number여야 해서 bigint → number 변환
+   // [0n, 1n, …, (n-1)n] — Array.from needs a number length, so convert bigint → number
   const ids = Array.from ({ length: Number(next.data ?? 0n) }, (_, i) => BigInt(i)) 
 
   // each number's information 
@@ -603,19 +603,19 @@ function Market(){
       functionName: 'listings',
       args: [id],
     }) as const),
-    allowFailure: false, // 존재하지 않는 listingId는 실패하므로 allowFailure 필요
+    allowFailure: false, // a nonexistent listingId would revert
     query: { enabled: !!addresses&& ids.length > 0 },
 
   })
 
 
     const active: Listing[] = (raw.data ?? []).map((l, i) => ({ id: ids[i],seller: l[0], tokenId: l[2], price: l[3], paymentToken: l[4], active: l[5] })).filter((l) => l.active)
-  if (!addresses) return <p>이 체인에는 배포된 컨트렉트가 없습니다.</p>
-  if (raw.isPending) return <p>마켓 정보 로딩 중...</p>
-  if (raw.isError) return <p>읽기 실패: {raw.error.message}</p>
+  if (!addresses) return <p>No contracts deployed on this chain.</p>
+  if (raw.isPending) return <p>Loading market…</p>
+  if (raw.isError) return <p>Read failed: {raw.error.message}</p>
     return (
     <section>
-      <h2>마켓 ({active.length}건)</h2>
+      <h2>Market ({active.length})</h2>
       {active.map((l) => (
         <ListingCard key={l.id.toString()} listing={l} />
       ))}
@@ -623,24 +623,24 @@ function Market(){
   )
   }
 
-/** 판매 건 하나: 판매자에게는 취소, 다른 사람에게는 approve → 구매 */
+/** A single listing: Cancel for the seller, approve → Buy for everyone else */
 function ListingCard({ listing }: { listing: Listing }) {
   const connection = useConnection()
   const addresses = ADDRESSES[connection.chainId ?? 0]
   const me = connection.address
   const queryClient = useQueryClient()
 
-  const isSeller = !!me && isAddressEqual(listing.seller, me) // [5]
+  const isSeller = !!me && isAddressEqual(listing.seller, me)
 
-  // 구매자일 때만: 결제 토큰을 AMM에게 얼마나 허락했나
+  // Buyers only: how much payment token the AMM is allowed to spend
   const allowance = useReadContract({
-    address: listing.paymentToken, // 결제 토큰 컨트랙트에 묻기 (SW42 또는 R2B)
+    address: listing.paymentToken, // ask the payment token contract (SW42 or R2B)
     abi: tokenAbi,
     functionName: 'allowance',
     args: me && addresses ? [me, addresses.amm] : undefined,
     query: { enabled: !!me && !!addresses && !isSeller },
   })
-  const needApprove = (allowance.data ?? 0n) < listing.price // [6]
+  const needApprove = (allowance.data ?? 0n) < listing.price
 
   const write = useWriteContract()
   const receipt = useWaitForTransactionReceipt({ hash: write.data })
@@ -663,13 +663,13 @@ function ListingCard({ listing }: { listing: Listing }) {
           disabled={busy}
           onClick={() => write.mutate({ address: addresses.amm, abi: ammAbi, functionName: 'cancelListing', args: [listing.id] })}
         >
-          판매 취소
+          Cancel Listing
         </button>
       ) : needApprove ? (
         <button
           disabled={busy}
           onClick={() =>
-            write.mutate({ address: listing.paymentToken, abi: tokenAbi, functionName: 'approve', args: [addresses.amm, listing.price] }) // [7]
+            write.mutate({ address: listing.paymentToken, abi: tokenAbi, functionName: 'approve', args: [addresses.amm, listing.price] })
           }
         >
           {tokenName} Approve
@@ -677,20 +677,20 @@ function ListingCard({ listing }: { listing: Listing }) {
       ) : (
         <button
           disabled={busy}
-          onClick={() => write.mutate({ address: addresses.amm, abi: ammAbi, functionName: 'buyNFT', args: [listing.id] })} // [8]
+          onClick={() => write.mutate({ address: addresses.amm, abi: ammAbi, functionName: 'buyNFT', args: [listing.id] })}
         >
-          구매
+          Buy
         </button>
       )}
 
-      {receipt.isLoading && <p>채굴 기다리는 중…</p>}
-      {write.error && <p>실패: {write.error.message}</p>}
+      {receipt.isLoading && <p>Waiting for confirmation…</p>}
+      {write.error && <p>Failed: {write.error.message}</p>}
     </div>
   )
 }
 
 export default function App() {
-  const [tab, setTab] = useState<'trade' | 'explorer'>('trade') // 두 값중 하나만 적용
+  const [tab, setTab] = useState<'trade' | 'explorer'>('trade') // one of two values
   return (
     <main>
       <h1>TokenZswap</h1>

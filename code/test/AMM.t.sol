@@ -15,9 +15,9 @@ contract AMMTest is Test {
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
 
-    /// @dev 각 테스트 전에 실행: 토큰 2개 + AMM 배포, alice/bob에게 토큰 나눠주기
+    /// @dev Runs before each test: deploys two tokens + AMM and funds alice/bob
     function setUp() public {
-        tokenA = new SunWoo42(1_000_000 ether); // 이 테스트 컨트랙트가 배포자 → 전량 받음
+        tokenA = new SunWoo42(1_000_000 ether); // this test contract is the deployer, so it receives the full supply
         tokenB = new TokenB(1_000_000 ether);
         amm = new AMM(address(tokenA), address(tokenB));
 
@@ -27,7 +27,7 @@ contract AMMTest is Test {
         tokenB.transfer(bob, 10_000 ether);
     }
 
-    /// @dev who가 approve 2번 + addLiquidity 1번 (MetaMask 서명 3번과 같은 흐름)
+    /// @dev `who` does 2 approves + 1 addLiquidity (same flow as 3 MetaMask signatures)
     function _addLiquidity(address who, uint256 amountA, uint256 amountB) internal returns (uint256) {
         vm.startPrank(who);
         tokenA.approve(address(amm), amountA);
@@ -37,7 +37,7 @@ contract AMMTest is Test {
         return lp;
     }
 
-    // ───────────── 노트 T1: 첫 공급 ─────────────
+    // ───────────── T1: first deposit ─────────────
     function test_FirstDeposit_MintsSqrt() public {
         uint256 lp = _addLiquidity(alice, 100 ether, 400 ether);
 
@@ -47,7 +47,7 @@ contract AMMTest is Test {
         assertEq(amm.reserveB(), 400 ether);
     }
 
-    // ───────────── 노트 T2: 추가 공급 ─────────────
+    // ───────────── T2: additional deposit ─────────────
     function test_SecondDeposit_Proportional() public {
         _addLiquidity(alice, 100 ether, 400 ether);
         uint256 lp = _addLiquidity(bob, 100 ether, 400 ether);
@@ -56,26 +56,26 @@ contract AMMTest is Test {
         assertEq(amm.totalSupply(), 400 ether);
     }
 
-    // ───────────── 노트 T4: 부분 출금 ─────────────
+    // ───────────── T4: partial withdrawal ─────────────
     function test_RemoveLiquidity_Partial() public {
         _addLiquidity(alice, 100 ether, 400 ether);
         _addLiquidity(bob, 100 ether, 400 ether);
-        // 풀: 200 / 800 / LP 400.  Bob이 LP 100개(25%)만 뺌
+        // Pool: 200 / 800 / LP 400. Bob withdraws only 100 LP (25%)
 
         uint256 bobABefore = tokenA.balanceOf(bob);
-        vm.prank(bob); // 다음 호출 1번만 bob으로
+        vm.prank(bob); // only the next call is made as bob
         (uint256 outA, uint256 outB) = amm.removeLiquidity(100 ether);
 
         assertEq(outA, 50 ether); // 100 × 200 / 400
         assertEq(outB, 200 ether); // 100 × 800 / 400
-        assertEq(tokenA.balanceOf(bob), bobABefore + outA); // 실제로 지갑에 들어왔나
+        assertEq(tokenA.balanceOf(bob), bobABefore + outA); // tokens actually reached the wallet
         assertEq(amm.balanceOf(bob), 100 ether); // 200 − 100
     }
 
-    // ───────────── 실패해야 하는 경우 ─────────────
+    // ───────────── Expected failures ─────────────
     function test_RevertWhen_AddZero() public {
         vm.prank(alice);
-        vm.expectRevert(bytes("AMM: zero amount")); // addLiquidity의 require 메시지
+        vm.expectRevert(bytes("AMM: zero amount")); // addLiquidity's require message
         amm.addLiquidity(0, 100 ether);
     }
 
@@ -91,10 +91,10 @@ contract AMMTest is Test {
     function test_Swap_AToB_Invariants() public {
         _addLiquidity(alice, 100 ether, 400 ether);
         _addLiquidity(bob, 100 ether, 400 ether);
-        // 풀: 200 / 800 (노트 T3 시작 상태)
+        // Pool: 200 / 800 (T3 starting state)
 
         uint256 kBefore = amm.reserveA() * amm.reserveB();
-        uint256 expected = amm.getAmountOut(50 ether, amm.reserveA(), amm.reserveB()); // 스왑 전 reserveA, reserveB
+        uint256 expected = amm.getAmountOut(50 ether, amm.reserveA(), amm.reserveB()); // uses pre-swap reserveA, reserveB
 
         address carol = makeAddr("carol");
         tokenA.transfer(carol, 50 ether);
@@ -103,12 +103,12 @@ contract AMMTest is Test {
         uint256 kAfter = amm.reserveA() * amm.reserveB();
         uint256 noFeeOut = 800 ether * 50 ether / (200 ether + 50 ether); // 160 ether
 
-        assertGe(kAfter, kBefore, "k must not decrease"); // 규칙 ①
-        assertLt(amountOut, noFeeOut, "fee must reduce output"); // 규칙 ②
-        assertEq(amm.reserveA(), 250 ether, "reserveA grows by full amountIn"); // 규칙 ③
-        assertEq(amm.reserveB(), 800 ether - amountOut, "reserveB shrinks by amountOut"); // 규칙 ③
-        assertEq(amountOut, expected, "output matches getAmountOut preview"); // 규칙 ④
-        assertEq(tokenB.balanceOf(carol), amountOut, "carol received amountOut"); // carol 지갑에 실제로 들어왔나
+        assertGe(kAfter, kBefore, "k must not decrease"); // rule 1
+        assertLt(amountOut, noFeeOut, "fee must reduce output"); // rule 2
+        assertEq(amm.reserveA(), 250 ether, "reserveA grows by full amountIn"); // rule 3
+        assertEq(amm.reserveB(), 800 ether - amountOut, "reserveB shrinks by amountOut"); // rule 3
+        assertEq(amountOut, expected, "output matches getAmountOut preview"); // rule 4
+        assertEq(tokenB.balanceOf(carol), amountOut, "carol received amountOut"); // tokens actually reached carol's wallet
     }
 
     function test_RevertWhen_SlippageExceeded() public {
@@ -117,8 +117,8 @@ contract AMMTest is Test {
         tokenA.transfer(bob, 50 ether);
         vm.startPrank(bob);
         tokenA.approve(address(amm), 50 ether);
-        vm.expectRevert(bytes("AMM: slippage")); // swap의 슬리피지 require 메시지
-        amm.swap(address(tokenA), 50 ether, 1_000 ether); // 1000개 이상 달라고 요구 → 불가능
+        vm.expectRevert(bytes("AMM: slippage")); // swap's slippage require message
+        amm.swap(address(tokenA), 50 ether, 1_000 ether); // demands at least 1000 out → impossible
         vm.stopPrank();
     }
 }

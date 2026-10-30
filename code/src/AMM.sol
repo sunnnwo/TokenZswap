@@ -114,7 +114,7 @@ contract AMM is ERC20, ReentrancyGuard {
     function addLiquidity(uint256 amountA, uint256 amountB) external nonReentrant returns (uint256 liquidity) {
         require(amountA > 0 && amountB > 0, "AMM: zero amount");
 
-        // 1) LP 발행량 계산
+        // 1) Compute LP amount to mint
         uint256 lpSupply = totalSupply();
         if (lpSupply == 0) {
             liquidity = Math.sqrt(amountA * amountB);
@@ -123,15 +123,15 @@ contract AMM is ERC20, ReentrancyGuard {
         }
         require(liquidity > 0, "AMM: insufficient liquidity minted");
 
-        // 2) 토큰 가져오기 (caller → AMM)
+        // 2) Pull tokens (caller → AMM)
         tokenA.safeTransferFrom(msg.sender, address(this), amountA);
         tokenB.safeTransferFrom(msg.sender, address(this), amountB);
 
-        // 3) 장부 갱신
+        // 3) Update reserves
         reserveA = reserveA + amountA;
         reserveB = reserveB + amountB;
 
-        // 4) LP 발행 + 이벤트
+        // 4) Mint LP + emit event
         _mint(msg.sender, liquidity);
         emit LiquidityAdded(msg.sender, amountA, amountB, liquidity);
     }
@@ -154,11 +154,11 @@ contract AMM is ERC20, ReentrancyGuard {
 
         _burn(msg.sender, lpAmount);
 
-        // 장부 차감
+        // Decrease reserves
         reserveA = reserveA - amountA;
         reserveB = reserveB - amountB;
 
-        // 토큰 보내기
+        // Send tokens
         tokenA.safeTransfer(msg.sender, amountA);
         tokenB.safeTransfer(msg.sender, amountB);
 
@@ -184,7 +184,7 @@ contract AMM is ERC20, ReentrancyGuard {
         require(reserveIn > 0 && reserveOut > 0, "AMM: empty reserves");
 
         // 1 bp = 0.01% = 0.0001
-        uint256 amountInWithFee = amountIn * (BPS_DENOMINATOR - FEE_BPS); // 넣은 양 중 수수료를 뺀 부분만 계산에 사용
+        uint256 amountInWithFee = amountIn * (BPS_DENOMINATOR - FEE_BPS); // only the input net of the fee counts toward the output
         amountOut = amountInWithFee * reserveOut / (reserveIn * BPS_DENOMINATOR + amountInWithFee);
     }
 
@@ -201,23 +201,23 @@ contract AMM is ERC20, ReentrancyGuard {
         nonReentrant
         returns (uint256 amountOut)
     {
-        // 1) tokenIn이 풀의 토큰인지 확인
+        // 1) Check tokenIn is one of the pool's tokens
         require(tokenIn == address(tokenA) || tokenIn == address(tokenB), "AMM: invalid token");
-        // 2) 방향 정하기: A→B 인가?
+        // 2) Determine direction: is it A→B?
         bool isAToB = tokenIn == address(tokenA);
 
         (IERC20 inToken, IERC20 outToken, uint256 reserveIn, uint256 reserveOut) =
             isAToB ? (tokenA, tokenB, reserveA, reserveB) : (tokenB, tokenA, reserveB, reserveA);
 
-        // 3) 받을 양 계산 + 슬리피지 검사
+        // 3) Compute output + slippage check
         amountOut = getAmountOut(amountIn, reserveIn, reserveOut);
         require(amountOut >= minAmountOut, "AMM: slippage");
         require(amountOut > 0, "AMM: insufficient output");
 
-        // 4) 토큰 가져오기 (caller → AMM)
+        // 4) Pull tokens (caller → AMM)
         inToken.safeTransferFrom(msg.sender, address(this), amountIn);
 
-        // 5) 장부 갱신
+        // 5) Update reserves
         if (isAToB) {
             reserveA += amountIn;
             reserveB -= amountOut;
@@ -226,7 +226,7 @@ contract AMM is ERC20, ReentrancyGuard {
             reserveA -= amountOut;
         }
 
-        // 6) 토큰 보내기 (AMM → caller) + 이벤트
+        // 6) Send tokens (AMM → caller) + emit event
         outToken.safeTransfer(msg.sender, amountOut);
         emit Swap(msg.sender, tokenIn, amountIn, amountOut);
     }
@@ -272,26 +272,26 @@ contract AMM is ERC20, ReentrancyGuard {
         nonReentrant
         returns (uint256 listingId)
     {
-        // (라) (다) Checks
-        require(paymentToken == address(tokenA) || paymentToken == address(tokenB), "AMM: invalid payment token"); // [1]
+        // Checks
+        require(paymentToken == address(tokenA) || paymentToken == address(tokenB), "AMM: invalid payment token");
         require(price > 0, "AMM: zero price");
 
-        // (가) (마) Effects: 지금 번호에 저장하고, 다음 번호로
-        listingId = nextListingId; // [2]
+        // Effects: store under the current ID, then advance to the next one
+        listingId = nextListingId;
         listings[listingId] = Listing({
-            seller: msg.sender, // [3]
+            seller: msg.sender,
             nft: IERC721(nft),
             tokenId: tokenId,
             price: price,
             paymentToken: IERC20(paymentToken),
-            active: true // [4]
+            active: true
         });
         nextListingId = nextListingId + 1;
 
-        // (나) Interactions: NFT를 판매자 → AMM으로 (escrow)
-        IERC721(nft).transferFrom(msg.sender, address(this), tokenId); // [5]
+        // Interactions: move the NFT from seller → AMM (escrow)
+        IERC721(nft).transferFrom(msg.sender, address(this), tokenId);
 
-        // (바)
+        // Event
         emit NFTListed(listingId, msg.sender, nft, tokenId, paymentToken, price);
     }
 
@@ -301,17 +301,17 @@ contract AMM is ERC20, ReentrancyGuard {
      * @param listingId ID of the listing to cancel.
      */
     function cancelListing(uint256 listingId) external nonReentrant {
-        Listing storage listing = listings[listingId]; // [1] 원본 or 복사본?
+        Listing storage listing = listings[listingId]; // storage reference: writes go to the mapping, not a copy
 
         // Checks
-        require(listing.active, "AMM: listing not active"); // [2]
-        require(listing.seller == msg.sender, "AMM: not the seller"); // [3]
+        require(listing.active, "AMM: listing not active");
+        require(listing.seller == msg.sender, "AMM: not the seller");
 
         // Effects
-        listing.active = false; // [4]
+        listing.active = false;
 
-        // Interactions: AMM → 판매자로 NFT 반환
-        listing.nft.transferFrom(address(this), msg.sender, listing.tokenId); // [5]
+        // Interactions: return the NFT from AMM → seller
+        listing.nft.transferFrom(address(this), msg.sender, listing.tokenId);
 
         emit NFTListingCancelled(listingId, msg.sender);
     }
@@ -332,17 +332,17 @@ contract AMM is ERC20, ReentrancyGuard {
      * @param listingId ID of the listing to buy.
      */
     function buyNFT(uint256 listingId) external nonReentrant {
-        Listing storage listing = listings[listingId]; // [1]
+        Listing storage listing = listings[listingId]; // storage reference, so the update below persists
 
         // Checks
         require(listing.active, "AMM: listing not active");
 
         // Effects
-        listing.active = false; // [2]
+        listing.active = false; // mark sold before external calls (CEI)
 
         // Interactions
-        listing.paymentToken.safeTransferFrom(msg.sender, listing.seller, listing.price); // [3] 대금: 구매자 → 판매자
-        listing.nft.transferFrom(address(this), msg.sender, listing.tokenId); // [4] NFT: AMM → 구매자
+        listing.paymentToken.safeTransferFrom(msg.sender, listing.seller, listing.price); // payment: buyer → seller
+        listing.nft.transferFrom(address(this), msg.sender, listing.tokenId); // NFT: AMM → buyer
 
         emit NFTSold(listingId, msg.sender, listing.seller, listing.price);
     }

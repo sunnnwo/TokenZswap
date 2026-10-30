@@ -4,11 +4,11 @@ import { ADDRESSES } from './contracts.ts'
 import { api } from './api.ts'
 import { useState } from 'react'
 
-/** /api/pool 응답 모양 (DB 칼럼 이름, 큰 숫자는 문자열) */
+/** /api/pool response shape (DB column names, big numbers as strings) */
 type Pool = { reserve_a: string; reserve_b: string; total_liquidity: string; swap_count: string }
 
 
-/** subgraph address is not Majority, -> for compare tokenA also not Majority */
+/** Addresses from the API are lowercase, so compare against a lowercase tokenA */
 const TOKEN_A = ADDRESSES[97].tokenA.toLowerCase()
 
 /** 0x8124b5be…9619 → 0x8124…9619 */
@@ -16,47 +16,47 @@ function shortAddr(a: string): string {
   return `${a.slice(0, 6)}…${a.slice(-4)}`
 }
 
-/** 유닉스 초(문자열) → 읽기 쉬운 날짜 */
+/** Unix seconds (string) → readable date */
 function formatTime(ts: string): string {
-  return new Date(Number(ts) * 1000).toLocaleString() // [1] 초 → 밀리초
+  return new Date(Number(ts) * 1000).toLocaleString() // seconds → milliseconds
 }
-/** /api/swaps 한 행 */
+/** One /api/swaps row */
 type Swap = {
   id: string; trader: string; token_in: string; amount_in: string; amount_out: string; timestamp: string; tx_hash: string
 }
-/** /api/liquidity 한 행 */
+/** One /api/liquidity row */
 type LiquidityEvent = {
   id: string; type: 'ADD' | 'REMOVE'; provider: string; amount_a: string; amount_b: string; liquidity: string; timestamp: string
 }
 
-/** /api/listings 한 행 */
+/** One /api/listings row */
 type Listing = {
   id: string; seller: string; nft: string; token_id: string; payment_token: string
-  price: string; status: 'ACTIVE' | 'SOLD' | 'CANCELLED'; buyer: string | null; created_at: string   // [1] 팔리기 전엔 null
+  price: string; status: 'ACTIVE' | 'SOLD' | 'CANCELLED'; buyer: string | null; created_at: string   // null until sold
 }
 
-/** 필터 버튼 4개 */
+/** The four filter buttons */
 const STATUSES = ['ALL', 'ACTIVE', 'SOLD', 'CANCELLED'] as const
 type StatusFilter = (typeof STATUSES)[number]   // 'ALL' | 'ACTIVE' | 'SOLD' | 'CANCELLED'
 
-/** /api/nfts 한 행 */
+/** One /api/nfts row */
 
 type Nft = {id: string; owner: string}
 
-/** 주인이 AMM이면 마켓에 맡겨진 NFT */
+/** If the owner is the AMM, the NFT is held by the market */
 
 const AMM = ADDRESSES[97].amm.toLowerCase()
 
 
 
-/** 최근 swap과 유동성 기록 */
+/** Recent swaps and liquidity events */
 function History() {
     const h = useQuery({
     queryKey: ['api', 'history'],
     queryFn: async () => {
-      const [swaps, liquidity] = await Promise.all([       // [1] 동시에 보내고 다 기다리기
+      const [swaps, liquidity] = await Promise.all([       // send both at once and wait for both
         api<Swap[]>('/swaps'),
-        api<LiquidityEvent[]>('/liquidity'),                      // [2] 유동성 주소
+        api<LiquidityEvent[]>('/liquidity'),
       ])
       return { swaps, liquidity }
     },
@@ -73,7 +73,7 @@ function History() {
       <table>
         <tbody>
           {h.data.swaps.map((s) => {
-            const aToB = s.token_in === TOKEN_A // [3] 넣은 토큰이 A인가
+            const aToB = s.token_in === TOKEN_A // was the input token A?
             return (
               <tr key={s.id}>
                 <td>{formatTime(s.timestamp)}</td>
@@ -113,27 +113,27 @@ function History() {
   )
 }
 
-/** 풀 통계: 지갑 없이도 보이는 정보 */
+/** Pool stats: visible without a wallet */
 function PoolStats() {
   const pool = useQuery({
     queryKey: ['api', 'pool'],
-    queryFn: () => api<Pool | null>('/pool'),          // [1] 풀 주소 (/api 뒤 부분만)
+    queryFn: () => api<Pool | null>('/pool'),          // path after /api
     refetchInterval: 10_000,
   })
 
-  if (pool.isPending) return <p>풀 통계 불러오는 중…</p>
-  if (pool.isError) return <p>캐시 서버 읽기 실패: {pool.error.message}</p>
+  if (pool.isPending) return <p>Loading pool stats…</p>
+  if (pool.isError) return <p>Failed to read cache server: {pool.error.message}</p>
 
-  const p = pool.data                                  // [2] 배열 아님, 그대로
-  if (!p) return <p>아직 풀이 없습니다.</p>
+  const p = pool.data                                  // a single object, not an array
+  if (!p) return <p>No pool yet.</p>
 
-  const reserveA = BigInt(p.reserve_a)                      // [3]
+  const reserveA = BigInt(p.reserve_a)
   const reserveB = BigInt(p.reserve_b)
   const price = reserveA > 0n ? Number(formatUnits(reserveB, 18)) / Number(formatUnits(reserveA, 18)) : 0
 
   return (
     <section>
-      <h2>풀 통계 (캐시 서버)</h2>
+      <h2>Pool Stats (cache server)</h2>
       <table>
         <tbody>
           <tr><td>SW42 (A)</td><td>{formatUnits(reserveA, 18)}</td></tr>
@@ -147,13 +147,13 @@ function PoolStats() {
   )
 }
 
-/** NFT 판매 기록: 상태별로 골라 보기 */
+/** NFT listing history, filterable by status */
 function MarketHistory() {
   const [filter, setFilter] = useState<StatusFilter>('ALL')
 
   const listings = useQuery({
-    queryKey: ['api', 'listings', filter],                                          // [2] 버튼마다 다른 질문
-    queryFn: () => api<Listing[]>(filter === 'ALL' ? '/listings' : `/listings?status=${filter}`),   // [3]
+    queryKey: ['api', 'listings', filter],                                          // separate cache entry per filter
+    queryFn: () => api<Listing[]>(filter === 'ALL' ? '/listings' : `/listings?status=${filter}`),
     refetchInterval: 10_000,
   })
 
@@ -168,9 +168,9 @@ function MarketHistory() {
         ))}
       </div>
 
-      {listings.isPending && <p>불러오는 중…</p>}
-      {listings.isError && <p>캐시 서버 읽기 실패: {listings.error.message}</p>}
-      {listings.data?.length === 0 && <p>해당하는 판매 건이 없습니다.</p>}
+      {listings.isPending && <p>Loading…</p>}
+      {listings.isError && <p>Failed to read cache server: {listings.error.message}</p>}
+      {listings.data?.length === 0 && <p>No matching listings.</p>}
 
       {listings.data && listings.data.length > 0 && (
         <table>
@@ -181,8 +181,8 @@ function MarketHistory() {
                 <td>NFT #{l.token_id}</td>
                 <td>{formatUnits(BigInt(l.price), 18)} {l.payment_token === TOKEN_A ? 'SW42' : 'R2B'}</td>
                 <td>{l.status}</td>
-                <td>판매자 {shortAddr(l.seller)}</td>
-                <td>{l.buyer ? `구매자 ${shortAddr(l.buyer)}` : '-'}</td>
+                <td>Seller {shortAddr(l.seller)}</td>
+                <td>{l.buyer ? `Buyer ${shortAddr(l.buyer)}` : '-'}</td>
                 <td>{formatTime(l.created_at)}</td>
               </tr>
             ))}
@@ -194,14 +194,14 @@ function MarketHistory() {
 }
 
 
-/** NFT 주인 찾기: 주소로 검색, 비우면 전체 */
+/** NFT owner lookup: search by address, empty = all */
 function NftOwners() {
-  const [input, setInput] = useState('')   // 입력칸에 치는 중인 글자
-  const [owner, setOwner] = useState('')   // 검색 버튼을 누른 주소 ('' = 전체)
+  const [input, setInput] = useState('')   // text currently typed in the input
+  const [owner, setOwner] = useState('')   // address submitted with Search ('' = all)
 
   const nfts = useQuery({
-    queryKey: ['api', 'nfts', owner],                                                    // [1]
-    queryFn: () => api<Nft[]>(owner ? `/nfts?owner=${ encodeURIComponent(owner)}` : '/nfts'),          // [2]
+    queryKey: ['api', 'nfts', owner],
+    queryFn: () => api<Nft[]>(owner ? `/nfts?owner=${ encodeURIComponent(owner)}` : '/nfts'),
     refetchInterval: 10_000,
   })
 
@@ -210,14 +210,14 @@ function NftOwners() {
       <h2>NFT Owners</h2>
       <input
         value={input}
-        onChange={(e) => setInput(e.target.value)}                                          // [3]
-        placeholder="0x… (비우면 전체)"
+        onChange={(e) => setInput(e.target.value)}
+        placeholder="0x… (empty = all)"
       />
-      <button onClick={() => setOwner(input.trim())}>검색</button>                          {/* [4] */}
+      <button onClick={() => setOwner(input.trim())}>Search</button>
 
-      {nfts.isPending && <p>불러오는 중…</p>}
-      {nfts.isError && <p>캐시 서버 읽기 실패: {nfts.error.message}</p>}
-      {nfts.data?.length === 0 && <p>이 주소가 가진 NFT가 없습니다.</p>}
+      {nfts.isPending && <p>Loading…</p>}
+      {nfts.isError && <p>Failed to read cache server: {nfts.error.message}</p>}
+      {nfts.data?.length === 0 && <p>This address owns no NFTs.</p>}
 
       {nfts.data && nfts.data.length > 0 && (
         <table>
@@ -225,7 +225,7 @@ function NftOwners() {
             {nfts.data.map((n) => (
               <tr key={n.id}>
                 <td>NFT #{n.id}</td>
-                <td>{n.owner === AMM ? '마켓 보관 중 (AMM)' : shortAddr(n.owner)}</td>
+                <td>{n.owner === AMM ? 'Held by market (AMM)' : shortAddr(n.owner)}</td>
               </tr>
             ))}
           </tbody>
@@ -237,7 +237,7 @@ function NftOwners() {
 
 
 
-/** 탐색기 탭 전체: 풀 통계, 기록, 마켓, NFT 주인 (데이터는 캐시 서버 /api) */
+/** Explorer tab: pool stats, history, market, NFT owners (data from the cache server /api) */
 export default function Explorer() {
   return (
     <div>

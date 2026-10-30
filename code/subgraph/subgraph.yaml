@@ -6,11 +6,11 @@ schema:
 dataSources:
   - kind: ethereum/contract
     name: AMM
-    network: chapel # [1] The Graph에서 BSC 테스트넷을 부르는 이름
+    network: chapel # The Graph's name for BSC testnet
     source:
-      address: "0x0a1134046cECA785a218A92376fdb542cB9ACA52" # [2] AMM 주소 (deployment/97.json)
+      address: "0x0a1134046cECA785a218A92376fdb542cB9ACA52" # AMM address (deployment/97.json)
       abi: AMM
-      startBlock: 138043275 # [3]
+      startBlock: 138043275
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -35,11 +35,11 @@ dataSources:
       file: ./src/amm.ts
   - kind: ethereum/contract
     name: TokenizeArt
-    network: chapel # [1]과 같음
+    network: chapel # Same as the AMM data source
     source:
-      address: "0x7DA2B6BC5330ad801427E6879201b079A774aB15" # [5] NFT 주소
+      address: "0x7DA2B6BC5330ad801427E6879201b079A774aB15" # NFT address
       abi: TokenizeArt
-      startBlock: 138043275 # [3]과 같음
+      startBlock: 138043275 # Same as the AMM data source
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -49,6 +49,6 @@ dataSources:
         - name: TokenizeArt
           file: ./abis/TokenizeArt.json
       eventHandlers:
-        - event: Transfer(indexed address,indexed address,indexed uint256) # [6] ERC-721의 세 번째 값
+        - event: Transfer(indexed address,indexed address,indexed uint256) # In ERC-721 the third value (tokenId) is also indexed
           handler: handleTransfer
       file: ./src/nft.ts

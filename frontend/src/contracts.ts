@@ -2,7 +2,7 @@ import { parseAbi, type Address } from 'viem'
 
 type Deployment = { amm: Address; tokenA: Address; tokenB: Address; nft: Address }
 
-/** 체인 ID → 배포 주소. deployment/<chainId>.json에서 옮겨 온다. */
+/** Chain ID → deployed addresses, copied from deployment/<chainId>.json. */
 export const ADDRESSES: Record<number, Deployment> = {
   31337: {
     amm: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0',
@@ -18,11 +18,11 @@ export const ADDRESSES: Record<number, Deployment> = {
   },
 }
 
-/** AMM에서 지금 읽을 함수들만 (나중에 swap 등을 추가한다) */
+/** AMM functions used by the frontend */
 export const ammAbi = parseAbi([
   'function reserveA() view returns (uint256)',
   'function reserveB() view returns (uint256)',
-  'function totalSupply() view returns (uint256)', // [1] LP 토큰 총발행량. AMM은 ERC20을 상속했으니 ERC20 표준 함수 이름
+  'function totalSupply() view returns (uint256)', // LP token total supply (the AMM inherits ERC20, so this is the standard ERC20 function)
   'function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) pure returns (uint256)',
   'function swap(address tokenIn, uint256 amountIn, uint256 minAmountOut) returns (uint256 )',
   'function addLiquidity(uint256 amountA, uint256 amountB) returns (uint256 liquidity)',
@@ -49,10 +49,10 @@ return ipfsUri.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')    }
     return ipfsUri
 }   
 
-/** SW42 / R2B 공통 (둘 다 ERC20 + faucet). AMM의 LP 토큰도 ERC20이라 balanceOf는 이걸로 읽을 수 있다. */
+/** Shared by SW42 / R2B (both ERC20 + faucet). The AMM LP token is also ERC20, so its balanceOf can be read with this too. */
 export const tokenAbi = parseAbi([
   'function balanceOf(address owner) view returns (uint256)',
-  'function faucet()', // [1] faucet 함수 시그니처 (인자도, 반환값도 없음. view일까요?)
+  'function faucet()', // no arguments, no return value; not a view (it mints tokens)
   'function approve(address spender, uint256 amount) returns (bool)',
   'function allowance(address owner, address spender) view returns (uint256)',
 ])

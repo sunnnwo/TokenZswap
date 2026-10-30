@@ -15,14 +15,14 @@ contract NFTMarketTest is Test {
     TokenB tokenB;
     TokenizeArt nft;
 
-    address alice = makeAddr("alice"); // 판매자
-    address bob = makeAddr("bob"); // 구매자
-    address carol = makeAddr("carol"); // 두 번째 구매자 (실패 케이스용)
+    address alice = makeAddr("alice"); // seller
+    address bob = makeAddr("bob"); // buyer
+    address carol = makeAddr("carol"); // second buyer (for failure cases)
 
-    uint256 constant TOKEN_ID = 0; // alice가 받는 첫 NFT 번호 (TokenizeArt는 0번부터 발행)
+    uint256 constant TOKEN_ID = 0; // first NFT ID alice receives (TokenizeArt mints from 0)
     uint256 constant PRICE = 500 ether;
 
-    // 이벤트를 expectEmit으로 비교하려면 테스트 쪽에도 같은 모양으로 선언해 둬야 합니다.
+    // To compare events with expectEmit, the test must declare them with the same signature.
     event NFTListed(
         uint256 indexed listingId,
         address indexed seller,
@@ -32,14 +32,14 @@ contract NFTMarketTest is Test {
         uint256 price
     );
 
-    /// @dev 토큰 2개 + AMM + NFT 배포, alice에게 NFT 0번, bob과 carol에게 결제용 토큰
+    /// @dev Deploys two tokens + AMM + NFT, gives alice NFT #0 and bob/carol payment tokens
     function setUp() public {
         tokenA = new SunWoo42(1_000_000 ether);
         tokenB = new TokenB(1_000_000 ether);
         amm = new AMM(address(tokenA), address(tokenB));
-        nft = new TokenizeArt("ipfs://test-metadata"); // 이 테스트 컨트랙트가 owner → mint 가능
+        nft = new TokenizeArt("ipfs://test-metadata"); // this test contract is the owner, so it can mint
 
-        nft.mint(alice); // alice가 NFT 0번을 가짐
+        nft.mint(alice); // alice now owns NFT #0
 
         tokenA.transfer(bob, 10_000 ether);
         tokenB.transfer(bob, 10_000 ether);
@@ -47,9 +47,9 @@ contract NFTMarketTest is Test {
         tokenB.transfer(carol, 10_000 ether);
     }
 
-    // ───────────────────────────── 도우미 ─────────────────────────────
+    // ───────────────────────────── Helpers ─────────────────────────────
 
-    /// @dev alice가 approve 1번 + listNFT 1번 (MetaMask 서명 2번과 같은 흐름)
+    /// @dev alice does 1 approve + 1 listNFT (same flow as 2 MetaMask signatures)
     function _listAsAlice(address paymentToken) internal returns (uint256 listingId) {
         vm.startPrank(alice);
         nft.approve(address(amm), TOKEN_ID);
@@ -57,7 +57,7 @@ contract NFTMarketTest is Test {
         vm.stopPrank();
     }
 
-    /// @dev who가 결제 토큰 approve 1번 + buyNFT 1번
+    /// @dev `who` does 1 payment-token approve + 1 buyNFT
     function _buy(address who, address paymentToken, uint256 listingId) internal {
         vm.startPrank(who);
         IERC20(paymentToken).approve(address(amm), PRICE);
@@ -65,12 +65,12 @@ contract NFTMarketTest is Test {
         vm.stopPrank();
     }
 
-    /// @dev listings(id)는 필드 6개를 튜플로 돌려줍니다. 그중 마지막(active)만 꺼냅니다.
+    /// @dev listings(id) returns the 6 fields as a tuple; this extracts only the last one (active).
     function _isActive(uint256 listingId) internal view returns (bool active) {
         (,,,,, active) = amm.listings(listingId);
     }
 
-    // ───────────────────────────── A. 등록 ─────────────────────────────
+    // ───────────────────────────── A. Listing ─────────────────────────────
 
     function test_List_EscrowsNFTAndStoresListing() public {
         uint256 listingId = _listAsAlice(address(tokenA));
@@ -88,9 +88,9 @@ contract NFTMarketTest is Test {
 
     function test_List_EmitsEvent() public {
         vm.startPrank(alice);
-        nft.approve(address(amm), TOKEN_ID); // approve를 먼저: 이것도 Approval 이벤트를 내기 때문
+        nft.approve(address(amm), TOKEN_ID); // approve first, since it also emits an Approval event
 
-        // 바로 다음 호출(listNFT)이 이 이벤트를 내야 함. (topic1, topic2, topic3, data) 모두 비교
+        // The very next call (listNFT) must emit this event; compare topic1, topic2, topic3 and data
         vm.expectEmit(true, true, true, true, address(amm));
         emit NFTListed(0, alice, address(nft), TOKEN_ID, address(tokenA), PRICE);
 
@@ -98,7 +98,7 @@ contract NFTMarketTest is Test {
         vm.stopPrank();
     }
 
-    // ───────────────────────────── B. 취소 ─────────────────────────────
+    // ───────────────────────────── B. Cancel ─────────────────────────────
 
     function test_Cancel_ReturnsNFTAndDeactivates() public {
         uint256 listingId = _listAsAlice(address(tokenA));
@@ -110,10 +110,10 @@ contract NFTMarketTest is Test {
         assertFalse(_isActive(listingId), "listing must be inactive (storage, not memory)");
     }
 
-    // ───────────────────────────── C. 구매 ─────────────────────────────
+    // ───────────────────────────── C. Buy ─────────────────────────────
 
     function test_Buy_PaysSellerAndTransfersNFT() public {
-        uint256 listingId = _listAsAlice(address(tokenB)); // 이번엔 R2B로 결제받는 등록
+        uint256 listingId = _listAsAlice(address(tokenB)); // this time the listing is paid in R2B
 
         uint256 aliceBefore = tokenB.balanceOf(alice);
         uint256 bobBefore = tokenB.balanceOf(bob);
@@ -127,7 +127,7 @@ contract NFTMarketTest is Test {
         assertFalse(_isActive(listingId), "sold listing is inactive");
     }
 
-    // ───────────────────────────── D. 남이 취소 시도 ─────────────────────────────
+    // ───────────────────────────── D. Cancel by non-seller ─────────────────────────────
 
     function test_RevertWhen_NonSellerCancels() public {
         uint256 listingId = _listAsAlice(address(tokenA));
@@ -137,7 +137,7 @@ contract NFTMarketTest is Test {
         amm.cancelListing(listingId);
     }
 
-    // ───────────────────────────── E. 두 번 구매 시도 ─────────────────────────────
+    // ───────────────────────────── E. Double purchase ─────────────────────────────
 
     function test_RevertWhen_BuyingSoldListing() public {
         uint256 listingId = _listAsAlice(address(tokenA));
@@ -150,10 +150,10 @@ contract NFTMarketTest is Test {
         vm.stopPrank();
     }
 
-    // ───────────────────────────── F. 잘못된 결제 토큰 ─────────────────────────────
+    // ───────────────────────────── F. Invalid payment token ─────────────────────────────
 
     function test_RevertWhen_InvalidPaymentToken() public {
-        SunWoo42 otherToken = new SunWoo42(1 ether); // 풀과 무관한 토큰
+        SunWoo42 otherToken = new SunWoo42(1 ether); // token unrelated to the pool
 
         vm.startPrank(alice);
         nft.approve(address(amm), TOKEN_ID);
@@ -162,10 +162,10 @@ contract NFTMarketTest is Test {
         vm.stopPrank();
     }
 
-    // ───────────────────────────── G. 풀과 독립 ─────────────────────────────
+    // ───────────────────────────── G. Independent of the pool ─────────────────────────────
 
     function test_Marketplace_DoesNotTouchPoolReserves() public {
-        // 풀에 유동성을 먼저 넣어 둠 (bob이 공급자)
+        // Seed the pool with liquidity first (bob is the provider)
         vm.startPrank(bob);
         tokenA.approve(address(amm), 100 ether);
         tokenB.approve(address(amm), 400 ether);

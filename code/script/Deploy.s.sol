@@ -14,43 +14,43 @@ import {TokenizeArt} from "../src/TokenizeArt.sol";
  */
 contract Deploy is Script {
     uint256 constant INITIAL_SUPPLY = 1_000_000 ether;
-    uint256 constant SEED_A = 10_000 ether; // 첫 유동성: SW42
-    uint256 constant SEED_B = 40_000 ether; // 첫 유동성: R2B  → 초기 가격 1 SW42 = 4 R2B
+    uint256 constant SEED_A = 10_000 ether; // initial liquidity: SW42
+    uint256 constant SEED_B = 40_000 ether; // initial liquidity: R2B  → initial price 1 SW42 = 4 R2B
     uint256 constant DEMO_NFTS = 3;
 
     function run() external {
-        uint256 startBlock = block.number; // 서브그래프가 이 블록부터 읽기 시작
+        uint256 startBlock = block.number; // the subgraph starts indexing from this block
 
         vm.startBroadcast();
 
-        // ① ② 토큰
+        // Tokens
         SunWoo42 tokenA = new SunWoo42(INITIAL_SUPPLY);
         TokenB tokenB = new TokenB(INITIAL_SUPPLY);
 
-        // ③ AMM
-        AMM amm = new AMM(address(tokenA), address(tokenB)); // [1]
+        // AMM
+        AMM amm = new AMM(address(tokenA), address(tokenB));
 
-        // ④ NFT
+        // NFT
         TokenizeArt nft = new TokenizeArt(
             vm.envOr("NFT_METADATA_URI", string("ipfs://bafkreibpuvb4ehyxxwtachnid5whw4nw3q3vhupewzj2mcflxo4oo4vd6i"))
         );
 
-        // 배포자 주소: 토큰의 owner가 곧 배포자 (Ownable(msg.sender))
+        // Deployer address: the token owner is the deployer (Ownable(msg.sender))
         address deployer = tokenA.owner();
 
-        // ⑤ 첫 유동성 (approve 2번 + addLiquidity)
-        tokenA.approve(address(amm), SEED_A); // [2]
-        tokenB.approve(address(amm), SEED_B); // [2]
-        amm.addLiquidity(SEED_A, SEED_B); // [3]
+        // Initial liquidity (2 approves + addLiquidity)
+        tokenA.approve(address(amm), SEED_A);
+        tokenB.approve(address(amm), SEED_B);
+        amm.addLiquidity(SEED_A, SEED_B);
 
-        // ⑥ 데모 NFT
+        // Demo NFTs
         for (uint256 i = 0; i < DEMO_NFTS; i++) {
-            nft.mint(deployer); // [4]
+            nft.mint(deployer);
         }
 
         vm.stopBroadcast();
 
-        // ⑦ 주소 저장
+        // Save addresses
         string memory obj = "deployment";
         vm.serializeUint(obj, "chainId", block.chainid);
         vm.serializeUint(obj, "startBlock", startBlock);
