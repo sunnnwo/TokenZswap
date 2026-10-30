@@ -57,17 +57,27 @@ CREATE TABLE IF NOT EXISTS sync_state (
 `)
 }
 
-/** Read the bookmark: the last synced block, or 0 if none */
-export async function getLastBlock(): Promise<number> {
-  const r = await pool.query<{ value: string }>('SELECT value FROM sync_state WHERE key = $1', ['lastBlock'])
-  return r.rows.length > 0 ? Number(r.rows[0].value) : 0
+/** Read one sync_state value, or null if the key is missing */
+export async function getState(key: string): Promise<string | null> {
+  const r = await pool.query<{ value: string }>('SELECT value FROM sync_state WHERE key = $1', [key])
+  return r.rows.length > 0 ? r.rows[0].value : null
 }
 
-/** Write the bookmark: insert if missing, otherwise update */
-export async function setLastBlock(n: number): Promise<void> {
-  await pool.query( // Must await the result
+/** Write one sync_state value: insert if missing, otherwise update */
+export async function setState(key: string, value: string): Promise<void> {
+  await pool.query(
     `INSERT INTO sync_state (key, value) VALUES ($1, $2)
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-    ['lastBlock', String(n)],
+    [key, value],
   )
+}
+
+/** Read the bookmark: the last synced block, or 0 if none */
+export async function getLastBlock(): Promise<number> {
+  return Number((await getState('lastBlock')) ?? 0)
+}
+
+/** Write the bookmark */
+export async function setLastBlock(n: number): Promise<void> {
+  await setState('lastBlock', String(n))
 }

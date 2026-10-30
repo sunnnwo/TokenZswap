@@ -1,5 +1,6 @@
 import http from 'node:http'
 import { pool } from './db.js'
+import { getSyncStatus, setSyncInterval, syncNow } from './scheduler.ts'
 
 /** Send a JSON response to the browser */
 function sendJson(res: http.ServerResponse, status: number, body:unknown ): void {
@@ -35,13 +36,24 @@ const routes: Record<string, (q: URLSearchParams) => Promise<unknown>> = {
       : await pool.query('SELECT * FROM nfts ORDER BY id::numeric')
     return r.rows
   },
+  '/api/sync': async () => getSyncStatus(),                 // Sync interval, last run, 429 pause
+}
+
+/** POST address → execute (actions that change something) */
+const actions: Record<string, (q: URLSearchParams) => Promise<unknown>> = {
+  '/api/sync': async () => syncNow(),                       // Sync with Studio now (rate limited)
+  '/api/sync/interval': async (q) => {                      // ?seconds=60
+    await setSyncInterval(Number(q.get('seconds')))
+    return getSyncStatus()
+  },
 }
 
 /** Start a server that looks up each request in routes, runs it, and responds */
 export function startServer(port: number): void {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
-    const route = routes[url.pathname]                          // Path only (query string excluded)
+    const table = req.method === 'POST' ? actions : routes
+    const route = table[url.pathname]                           // Path only (query string excluded)
     if (!route) return sendJson(res, 404, { error: 'not found' })   // Unknown path
     try {
       sendJson(res, 200, await route(url.searchParams))                      // Await the DB result, then respond

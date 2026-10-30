@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatUnits } from 'viem'
 import { ADDRESSES } from './contracts.ts'
 import { api } from './api.ts'
@@ -237,11 +237,78 @@ function NftOwners() {
 
 
 
+/** /api/sync response shape (times in unix seconds) */
+type SyncStatus = {
+  intervalS: number; minIntervalS: number; running: boolean
+  lastRunAt: number | null; nextRunAt: number | null; pausedUntil: number | null
+  lastResult: { from: number; head: number; changed: number } | null; lastError: string | null
+}
+
+/** Cache server ↔ Studio sync: sync now, change the interval, see the last outcome */
+function SyncControl() {
+  const queryClient = useQueryClient()
+  const [seconds, setSeconds] = useState('')   // text in the box ('' = not edited yet, show the server value)
+  const [message, setMessage] = useState('')
+
+  const status = useQuery({
+    queryKey: ['api', 'sync'],
+    queryFn: () => api<SyncStatus>('/sync'),
+    refetchInterval: 5_000,
+  })
+
+  async function syncNow() {
+    const r = await api<{ ok: boolean; message: string }>('/sync', { method: 'POST' })
+    setMessage(r.message)
+    queryClient.invalidateQueries({ queryKey: ['api'] })   // every query key starts with 'api', so all tables reload
+  }
+
+  async function applyInterval() {
+    await api<SyncStatus>(`/sync/interval?seconds=${Number(seconds)}`, { method: 'POST' })
+    setSeconds('')
+    queryClient.invalidateQueries({ queryKey: ['api', 'sync'] })
+  }
+
+  const s = status.data
+  return (
+    <section>
+      <h2>Studio Sync</h2>
+      <button onClick={syncNow} disabled={s?.running}>Sync now</button>{' '}
+      <label>
+        Every{' '}
+        <input
+          type="number"
+          min={s?.minIntervalS}
+          value={seconds || (s?.intervalS ?? '')}
+          onChange={(e) => setSeconds(e.target.value)}
+          style={{ width: '5em' }}
+        />{' '}
+        s
+      </label>{' '}
+      <button onClick={applyInterval} disabled={!seconds}>Apply</button>
+      {message && <p>{message}</p>}
+
+      {status.isError && <p>Failed to read cache server: {status.error.message}</p>}
+      {s && (
+        <table>
+          <tbody>
+            <tr><td>Last sync</td><td>{s.lastRunAt ? formatTime(String(s.lastRunAt)) : '-'}</td></tr>
+            <tr><td>Next sync</td><td>{s.nextRunAt ? formatTime(String(s.nextRunAt)) : '-'}</td></tr>
+            <tr><td>Last result</td><td>{s.lastResult ? `block ${s.lastResult.head}, ${s.lastResult.changed} rows` : '-'}</td></tr>
+            {s.lastError && <tr><td>Error</td><td>{s.lastError}</td></tr>}
+            {s.pausedUntil && <tr><td>Paused until</td><td>{formatTime(String(s.pausedUntil))} (Studio quota)</td></tr>}
+          </tbody>
+        </table>
+      )}
+      <p>Minimum {s?.minIntervalS ?? 30} s: Studio allows 3000 requests a day, one per sync.</p>
+    </section>
+  )
+}
+
 /** Explorer tab: pool stats, history, market, NFT owners (data from the cache server /api) */
 export default function Explorer() {
   return (
     <div>
-      
+        <SyncControl />
         <PoolStats />
         <History />
         <MarketHistory />
