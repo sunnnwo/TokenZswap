@@ -17,6 +17,8 @@ import { ADDRESSES, ammAbi } from './contracts.ts'
 import { useEffect, useState} from 'react'
 import { tokenAbi, nftAbi, ipfsToHttp } from './contracts.ts'
 import { useQueryClient, useQuery } from '@tanstack/react-query'
+import Explorer from './explorer.tsx'
+
 
 
 const SLIPPAGE_BPS = 100n // 1%
@@ -688,17 +690,31 @@ function ListingCard({ listing }: { listing: Listing }) {
 }
 
 export default function App() {
+  const [tab, setTab] = useState<'trade' | 'explorer'>('trade') // 두 값중 하나만 적용
   return (
     <main>
       <h1>TokenZswap</h1>
-      <WalletBar />
-      <PoolInfo /> 
-      <MyBalance />
-      <Swap />
-      <AddLiquidity />
-      <RemoveLiquidity />
-      <MyNFTs />
-      <Market />
+      <nav>
+        <button disabled={tab === 'trade'} onClick={() => setTab('trade')}>Trade</button>
+        <button disabled={tab === 'explorer'} onClick={() => setTab('explorer')}>Explorer</button>
+      </nav>
+      {tab === 'trade' ?
+      ( 
+        <> 
+        <WalletBar />
+        <PoolInfo /> 
+        <MyBalance />
+        <Swap />
+        <AddLiquidity />
+        <RemoveLiquidity />
+        <MyNFTs />
+        <Market />
+         
+      </> 
+      ) : (
+        <Explorer />
+      )
+      }
     </main>
   )
 }
