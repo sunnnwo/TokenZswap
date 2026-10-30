@@ -15,7 +15,8 @@ flowchart LR
     RPC --- NFT[TokenizeArt<br/>ERC-721]
     AMM -. events .-> G[The Graph indexer<br/>subgraph on chapel]
     NFT -. Transfer events .-> G
-    G -->|GraphQL| FE
+    G -->|GraphQL, every 15 s| CS[Cache server<br/>+ PostgreSQL]
+    CS -->|/api JSON, Explorer tab| FE
     NFT -. tokenURI = ipfs://CID .-> IPFS[(IPFS<br/>metadata + image)]
     FE -->|https gateway| IPFS
 ```
@@ -23,6 +24,7 @@ flowchart LR
 - **Reads** (balances, reserves, quotes, listings) go from wagmi's HTTP transport straight to the RPC node. They cost nothing and do not open MetaMask.
 - **Writes** (approve, swap, addLiquidity, listNFT, …) are signed in MetaMask and broadcast to the chain.
 - The **subgraph** replays contract events from the start block and keeps an indexed copy of pool state, history, listings and NFT owners.
+- The **cache server** copies the subgraph into our own PostgreSQL every 15 s and serves it to the Explorer tab as a JSON API ([cache-server.md](cache-server.md)).
 - **NFT metadata** lives on IPFS. The contract stores only the `ipfs://` URI.
 
 ## 2. Contracts
@@ -82,7 +84,7 @@ Worked numbers (pool 10,000 A / 40,000 B, swap 100 A):
 | `minAmountOut` (1%) | 380.4298… B |
 | Pool after | 10,100 A / 39,615.7274… B, `k` 400,000,000 → 400,118,847 (the fee stays in the pool) |
 
-More math with round numbers: [amm-math.md](amm-math.md) (Korean). Step-by-step storage trace of one swap: [swap-trace.md](swap-trace.md) (Korean).
+More math with round numbers: [amm-math.md](amm-math.md). Step-by-step storage trace of one swap: [swap-trace.md](swap-trace.md).
 
 ### 2.3 NFT marketplace (inside `AMM`)
 

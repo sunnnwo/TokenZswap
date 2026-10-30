@@ -1,53 +1,55 @@
-# AMM 계산 공식 정리
+# AMM Math
 
-TokenZswap AMM이 쓰는 공식 네 개를, 나누어떨어지는 쉬운 숫자로 정리한 문서입니다.
+**English** · [한국어](amm-math.ko.md)
 
-## 기호
+The four formulas the TokenZswap AMM uses, worked through with round numbers that divide evenly.
 
-| 기호 | 코드에서 | 의미 |
+## Symbols
+
+| Symbol | In code | Meaning |
 |---|---|---|
-| `x` | `reserveA` | 풀 장부에 적힌 tokenA (SW42) 양 |
-| `y` | `reserveB` | 풀 장부에 적힌 tokenB (R2B) 양 |
-| `L` | `totalSupply()` | 발행된 LP 토큰 총량 |
-| `f` | `FEE_BPS / BPS_DENOMINATOR` | 스왑 수수료율 (300 / 10,000 = 3%) |
-| `k` | `x * y` | 풀의 곱. 스왑으로는 줄어들지 않음 |
+| `x` | `reserveA` | Amount of tokenA (SW42) recorded in the pool's books |
+| `y` | `reserveB` | Amount of tokenB (R2B) recorded in the pool's books |
+| `L` | `totalSupply()` | Total LP tokens minted |
+| `f` | `FEE_BPS / BPS_DENOMINATOR` | Swap fee rate (300 / 10,000 = 3%) |
+| `k` | `x * y` | The pool's product. Swaps never decrease it |
 
-## 공식 요약
+## Formula summary
 
-| 상황 | 공식 |
+| Situation | Formula |
 |---|---|
-| 첫 공급 (`L = 0`) | `LP = √(a × b)` |
-| 추가 공급 (`L > 0`) | `LP = min(a × L / x,  b × L / y)` |
-| 스왑 (A를 넣고 B를 받음) | `out = y × a(1−f) / (x + a(1−f))` |
-| 출금 (LP 소각) | `outA = lp × x / L`,  `outB = lp × y / L` |
+| First deposit (`L = 0`) | `LP = √(a × b)` |
+| Later deposit (`L > 0`) | `LP = min(a × L / x,  b × L / y)` |
+| Swap (put in A, get B) | `out = y × a(1−f) / (x + a(1−f))` |
+| Withdraw (burn LP) | `outA = lp × x / L`,  `outB = lp × y / L` |
 
 ---
 
-## 예제: 풀 하나의 일생
+## Example: the life of one pool
 
-빈 풀에서 시작해서 세 사람이 차례로 행동합니다.
+Starting from an empty pool, three people act in turn.
 
-### T1. Alice 첫 공급: SW42 100 + R2B 400
+### T1. Alice's first deposit: SW42 100 + R2B 400
 
-풀이 비어 있으므로(`L = 0`) 첫 공급 공식을 씁니다.
+The pool is empty (`L = 0`), so we use the first-deposit formula.
 
 ```
 LP = √(100 × 400) = √40,000 = 200
 ```
 
-| x | y | L | Alice LP | 가격 (y/x) |
+| x | y | L | Alice LP | Price (y/x) |
 |---|---|---|---|---|
 | 100 | 400 | 200 | 200 | 1 SW42 = 4 R2B |
 
-- 첫 공급자가 넣은 비율(100 : 400)이 그대로 **초기 가격**이 됩니다.
+- The ratio the first provider deposits (100 : 400) becomes the **initial price**.
 
-### T2. Bob 추가 공급: SW42 100 + R2B 400
+### T2. Bob's deposit: SW42 100 + R2B 400
 
-`L > 0`이므로 추가 공급 공식을 씁니다.
+`L > 0`, so we use the later-deposit formula.
 
 ```
-SW42 기준:  100 × 200 / 100 = 200
-R2B  기준:  400 × 200 / 400 = 200
+SW42 side:  100 × 200 / 100 = 200
+R2B  side:  400 × 200 / 400 = 200
 LP = min(200, 200) = 200
 ```
 
@@ -55,134 +57,134 @@ LP = min(200, 200) = 200
 |---|---|---|---|---|
 | 200 | 800 | 400 | 200 | 200 |
 
-**비율을 틀리게 넣으면?** Bob이 SW42 100 + R2B **500**을 넣었다면:
+**What if the ratio is wrong?** If Bob had deposited SW42 100 + R2B **500**:
 
 ```
-SW42 기준: 200,   R2B 기준: 500 × 200 / 400 = 250
+SW42 side: 200,   R2B side: 500 × 200 / 400 = 250
 LP = min(200, 250) = 200
 ```
 
-- LP는 똑같이 200개입니다. 더 넣은 R2B 100개는 풀에 남아 **모든 LP의 몫**이 됩니다.
-- `max`(250)를 주면 Bob이 남의 몫을 가져가게 됩니다. 그래서 항상 `min`입니다.
+- He still gets 200 LP. The extra 100 R2B stays in the pool and becomes **every LP's share**.
+- Giving him `max` (250) would let Bob take other people's share. That is why it is always `min`.
 
-### T3. Carol 스왑: SW42 50 → R2B
+### T3. Carol swaps: SW42 50 → R2B
 
-**먼저 수수료 없이** 계산해서 원리를 봅니다.
+**First without the fee**, to see the principle.
 
 ```
 out = 800 × 50 / (200 + 50) = 40,000 / 250 = 160 R2B
 ```
 
-| | x | y | k = x × y | 가격 (y/x) |
+| | x | y | k = x × y | Price (y/x) |
 |---|---|---|---|---|
-| 스왑 전 | 200 | 800 | 160,000 | 4.00 |
-| 스왑 후 | 250 | 640 | 160,000 | 2.56 |
+| Before swap | 200 | 800 | 160,000 | 4.00 |
+| After swap | 250 | 640 | 160,000 | 2.56 |
 
-- `k`가 그대로입니다. 공식이 `k`를 유지하도록 만들어졌기 때문입니다.
-- 1 SW42 = 4 R2B였으니 50개면 200개를 기대할 수 있지만, 실제로는 **160개**만 받습니다. 넣을수록 SW42가 흔해져서 값이 떨어지기 때문입니다. 이것이 **가격 영향(price impact)**입니다.
-- LP 총량(`L`)은 변하지 않습니다. 스왑은 공급이 아니니까요.
+- `k` is unchanged. The formula is built to preserve `k`.
+- At 1 SW42 = 4 R2B you might expect 200 for 50, but you actually get only **160**. The more you put in, the more plentiful SW42 becomes and the lower its value. This is **price impact**.
+- Total LP supply (`L`) does not change. A swap is not a deposit.
 
-**이제 수수료 3%를 넣으면:**
+**Now with the 3% fee:**
 
 ```
-수수료 뗀 투입량:  50 × 0.97 = 48.5
+Input after fee:  50 × 0.97 = 48.5
 out = 800 × 48.5 / (200 + 48.5) = 38,800 / 248.5 = 156.14 R2B
 ```
 
 | x | y | k |
 |---|---|---|
-| 250 (50개 **전부** 들어옴) | 643.86 | 160,965 ⬆ |
+| 250 (**all** 50 go in) | 643.86 | 160,965 ⬆ |
 
-- 계산에는 48.5개만 썼지만, 풀에는 50개가 전부 들어옵니다.
-- 그래서 `k`가 160,000 → 160,965로 **늘었습니다.** 이 증가분이 LP들의 수수료 수익입니다.
+- Only 48.5 is used in the calculation, but all 50 go into the pool.
+- So `k` **grew** from 160,000 to 160,965. That increase is the LPs' fee income.
 
-**Solidity 정수 계산** (곱셈을 먼저, 나눗셈은 마지막에 한 번):
+**Solidity integer math** (multiply first, divide once at the end):
 
 ```
 amountInWithFee = 50 × (10,000 − 300)          = 485,000
-분자            = 485,000 × 800                = 388,000,000
-분모            = 200 × 10,000 + 485,000       = 2,485,000
-amountOut       = 388,000,000 / 2,485,000      = 156.14 → 내림 → 156
+numerator       = 485,000 × 800                = 388,000,000
+denominator     = 200 × 10,000 + 485,000       = 2,485,000
+amountOut       = 388,000,000 / 2,485,000      = 156.14 → round down → 156
 ```
 
-- 내림은 항상 **풀에 유리한 쪽**입니다. 올림을 하면 풀이 조금씩 새어 나갑니다.
+- Rounding down always **favors the pool**. Rounding up would let the pool leak a little at a time.
 
-### T4. Bob 출금
+### T4. Bob withdraws
 
-계산을 쉽게 하려고 T3의 **수수료 없는** 결과(`x = 250, y = 640, L = 400`)를 이어서 씁니다.
+To keep the math simple, we continue from the **fee-free** result of T3 (`x = 250, y = 640, L = 400`).
 
-**전액 출금: LP 200개 소각**
+**Full withdrawal: burn 200 LP**
 
 ```
 outA = 200 × 250 / 400 = 125 SW42
 outB = 200 × 640 / 400 = 320 R2B
 ```
 
-**부분 출금: LP 100개만 소각**
+**Partial withdrawal: burn only 100 LP**
 
 ```
 outA = 100 × 250 / 400 = 62.5 SW42
 outB = 100 × 640 / 400 = 160  R2B
 ```
 
-- 소각할 LP 양을 정하는 것만으로 전액/부분 출금이 모두 됩니다.
-- Bob은 SW42 100 + R2B 400을 넣었는데, 전액 출금하면 **SW42 125 + R2B 320**을 받습니다. Carol이 SW42를 팔고 R2B를 사 가서 풀의 비율이 바뀌었기 때문입니다.
-- 출금 공식에는 "처음에 얼마 넣었나"가 들어가지 않습니다. LP는 **지금 풀의 몇 %**에 대한 증서입니다.
+- Choosing how much LP to burn is all it takes to do either a full or a partial withdrawal.
+- Bob deposited SW42 100 + R2B 400, but a full withdrawal returns **SW42 125 + R2B 320**. Carol sold SW42 and bought R2B, which changed the pool's ratio.
+- The withdrawal formula does not include "how much you originally put in". LP is a claim on **a percentage of the pool as it is now**.
 
 ---
 
-## 가격 영향 한눈에 보기
+## Price impact at a glance
 
-풀 SW42 1,000 / R2B 1,000 (1:1), 수수료 없음.
+Pool SW42 1,000 / R2B 1,000 (1:1), no fee.
 
-| 넣는 SW42 | 받는 R2B | 기대값(1:1) 대비 |
+| SW42 in | R2B out | vs. expected (1:1) |
 |---|---|---|
 | 10 | 9.90 | 99% |
 | 100 | 90.91 | 91% |
 | 1,000 | 500 | 50% |
 
-풀 크기에 비해 많이 넣을수록 손해가 커집니다. 그래서 유동성이 많은 풀일수록 좋습니다.
+The larger the input relative to the pool, the bigger the loss. That is why deeper liquidity is better.
 
 ---
 
-## 왜 `balanceOf` 대신 `reserve`로 계산하나
+## Why compute with `reserve` instead of `balanceOf`
 
 ```
-AMM이 가진 SW42 = tokenA.balanceOf(AMM) = 1,500
-    ├─ 풀 몫      reserveA = 1,000   ← 장부에 적힘. 가격·지분 계산에 사용
-    └─ 풀 몫 아님           500   ← 직접 송금된 돈, NFT 대금 등
+SW42 held by AMM = tokenA.balanceOf(AMM) = 1,500
+    ├─ pool share     reserveA = 1,000   ← recorded in the books. Used for price and share math
+    └─ not pool share           500   ← direct transfers, NFT proceeds, etc.
 ```
 
-- `balanceOf`는 **누구나** `transfer` 한 번으로 바꿀 수 있습니다.
-- `reserve`는 **우리 함수**(add / remove / swap)만 바꿀 수 있습니다.
-- 가격과 지분은 우리가 통제하는 숫자로만 계산해야 조작당하지 않습니다.
+- **Anyone** can change `balanceOf` with a single `transfer`.
+- Only **our functions** (add / remove / swap) can change `reserve`.
+- Price and shares must be computed only from numbers we control, or they can be manipulated.
 
-**`balanceOf`로 계산할 때의 공격 예시 (첫 공급자 공격):**
+**Attack example when computing with `balanceOf` (first-depositor attack):**
 
-| 단계 | 행동 | 풀 잔고 | L |
+| Step | Action | Pool balance | L |
 |---|---|---|---|
-| 1 | 공격자가 1 wei + 1 wei 공급 → LP 1개 | 1 wei | 1 |
-| 2 | 공격자가 10,000개를 그냥 `transfer` | 10,000 | 1 |
-| 3 | 피해자가 5,000개 공급 → LP = 5,000 × 1 / 10,000 = 0.5 → **0개** | 15,000 | 1 |
-| 4 | 공격자가 LP 1개(100%) 소각 → 15,000개 회수 | 0 | 0 |
+| 1 | Attacker deposits 1 wei + 1 wei → 1 LP | 1 wei | 1 |
+| 2 | Attacker simply `transfer`s 10,000 | 10,000 | 1 |
+| 3 | Victim deposits 5,000 → LP = 5,000 × 1 / 10,000 = 0.5 → **0** | 15,000 | 1 |
+| 4 | Attacker burns 1 LP (100%) → takes 15,000 | 0 | 0 |
 
-`reserve`로 계산하면 2단계의 송금은 장부에 없으므로, 3단계에서 피해자는 정상적으로 LP를 받습니다.
+With `reserve`, the transfer in step 2 is not in the books, so the victim receives LP normally in step 3.
 
 ---
 
-## 연습 문제
+## Exercises
 
-T2 직후 상태(`x = 200, y = 800, L = 400`)에서 시작합니다.
+Start from the state right after T2 (`x = 200, y = 800, L = 400`).
 
-1. Dave가 SW42 50 + R2B 200을 넣으면 LP를 몇 개 받나요?
-2. (1번 이후) Alice가 LP 200개를 전부 소각하면 각각 몇 개 받나요?
-3. T2 직후 상태에서 수수료 없이 SW42 200개를 넣으면 R2B를 몇 개 받나요? 기대값(1:4) 대비 몇 %인가요?
+1. If Dave deposits SW42 50 + R2B 200, how many LP does he receive?
+2. (After 1) If Alice burns all 200 of her LP, how much of each token does she receive?
+3. From the state right after T2, with no fee, how much R2B do you get for 200 SW42? What percentage of the expected amount (1:4) is that?
 
 <details>
-<summary>정답</summary>
+<summary>Answers</summary>
 
-1. `min(50 × 400 / 200, 200 × 400 / 800) = min(100, 100) =` **LP 100개**
-2. 상태: `x = 250, y = 1,000, L = 500`. `outA = 200 × 250 / 500 =` **100 SW42**, `outB = 200 × 1,000 / 500 =` **400 R2B**
-3. `800 × 200 / (200 + 200) =` **400 R2B**. 기대값 800개 대비 **50%**
+1. `min(50 × 400 / 200, 200 × 400 / 800) = min(100, 100) =` **100 LP**
+2. State: `x = 250, y = 1,000, L = 500`. `outA = 200 × 250 / 500 =` **100 SW42**, `outB = 200 × 1,000 / 500 =` **400 R2B**
+3. `800 × 200 / (200 + 200) =` **400 R2B**. **50%** of the expected 800
 
 </details>

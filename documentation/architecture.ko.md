@@ -15,7 +15,8 @@ flowchart LR
     RPC --- NFT[TokenizeArt<br/>ERC-721]
     AMM -. 이벤트 .-> G[The Graph 인덱서<br/>chapel 서브그래프]
     NFT -. Transfer 이벤트 .-> G
-    G -->|GraphQL| FE
+    G -->|GraphQL, 15초마다| CS[캐시 서버<br/>+ PostgreSQL]
+    CS -->|/api JSON, Explorer 탭| FE
     NFT -. tokenURI = ipfs://CID .-> IPFS[(IPFS<br/>메타데이터 + 이미지)]
     FE -->|https 게이트웨이| IPFS
 ```
@@ -23,6 +24,7 @@ flowchart LR
 - **읽기**(잔액, reserve, 견적, 판매 목록)는 wagmi의 HTTP transport가 RPC 노드에 바로 묻습니다. 비용이 없고 MetaMask 팝업도 뜨지 않습니다.
 - **쓰기**(approve, swap, addLiquidity, listNFT …)는 MetaMask에서 서명한 뒤 체인으로 전송됩니다.
 - **서브그래프**는 시작 블록부터 컨트랙트 이벤트를 다시 읽으며 풀 상태, 기록, 판매 건, NFT 소유자를 인덱싱해 둡니다.
+- **캐시 서버**는 15초마다 서브그래프를 우리 PostgreSQL에 복사하고, Explorer 탭에 JSON API로 제공합니다 ([cache-server.ko.md](cache-server.ko.md)).
 - **NFT 메타데이터**는 IPFS에 있습니다. 컨트랙트에는 `ipfs://` 주소만 저장됩니다.
 
 ## 2. 컨트랙트
@@ -82,7 +84,7 @@ flowchart LR
 | `minAmountOut` (1%) | 380.4298… B |
 | swap 후 풀 | A 10,100 / B 39,615.7274…, `k` 400,000,000 → 400,118,847 (수수료가 풀에 남음) |
 
-쉬운 숫자로 정리한 공식: [amm-math.md](amm-math.md). swap 한 번의 storage 변화를 한 줄씩 따라간 문서: [swap-trace.md](swap-trace.md).
+쉬운 숫자로 정리한 공식: [amm-math.ko.md](amm-math.ko.md). swap 한 번의 storage 변화를 한 줄씩 따라간 문서: [swap-trace.ko.md](swap-trace.ko.md).
 
 ### 2.3 NFT 마켓 (`AMM` 안)
 

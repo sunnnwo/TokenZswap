@@ -46,7 +46,7 @@ TokenZswap은 테스트넷에 배포한 학습용 프로젝트입니다. 아래 
 | 번호별 허락만 확인 | `ListNFTForm`이 `getApproved`만 읽어서, `setApprovalForAll`을 쓴 사용자에게도 Approve 버튼이 보임 | `isApprovedForAll`도 확인 |
 | 에러 메시지가 김 | viem의 `error.message` 전체를 표시 | `shortMessage` 표시 |
 | 정확한 양만 approve | swap, 공급, 구매마다 approve가 다시 필요 (안전하지만 팝업 1번 추가) | 선택형 "최대 승인" 옵션 |
-| 서브그래프를 아직 안 씀 | 화면은 모든 값을 체인에서 직접 읽음 | 목록 화면을 GraphQL로 전환 |
+| Trade 탭은 아직 체인을 직접 읽음 | Explorer 탭은 인덱싱된 데이터(캐시 서버)를 쓰지만, Trade 탭의 "내 NFT"와 판매 목록은 아직 컨트랙트를 훑음 | `/api/nfts?owner=`, `/api/listings?status=ACTIVE`로 전환 |
 
 ## 배포와 운영
 
@@ -55,3 +55,4 @@ TokenZswap은 테스트넷에 배포한 학습용 프로젝트입니다. 아래 
 | 업그레이드 불가 | 버그를 고치려면 재배포가 필요하고 주소가 바뀜 (프론트, 서브그래프, 유동성을 모두 다시 맞춰야 함) |
 | 테스트넷만 | BSC 테스트넷(chain 97)에만 배포. Sepolia는 프론트와 Foundry 설정에만 있고 배포는 안 함 |
 | BscScan 소스 검증 안 함 | 탐색기에 소스 코드가 아직 공개되지 않음 (API 키로 `forge verify-contract`) |
+| 웹 서버의 한계 | HTTP만, Studio 의존, 목록 20개 제한: [cache-server.ko.md](cache-server.ko.md#한계) 참고 |

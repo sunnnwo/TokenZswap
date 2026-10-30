@@ -9,8 +9,9 @@ A minimal decentralized exchange on **BNB Smart Chain testnet**: a constant-prod
 | AMM pool | Swap SW42 ⇄ R2B with `x · y = k`, add liquidity for LP tokens, withdraw fully or partially. 3% swap fee. |
 | NFT marketplace | List an ERC-721 at a fixed price in SW42 or R2B, cancel, or buy. The NFT is escrowed in the AMM contract. Independent of the pool. |
 | Test tokens | Two ERC-20s with a public `faucet()` (1000 tokens per address per day). |
-| Frontend | Vite + React + wagmi. Connect MetaMask, see balances, swap, provide/withdraw liquidity, list and buy NFTs. |
+| Frontend | Vite + React + wagmi. Trade tab: connect MetaMask, see balances, swap, provide/withdraw liquidity, list and buy NFTs. Explorer tab: pool stats, history, listings, NFT owners. |
 | Subgraph | Indexes pool state, swaps, liquidity events, listings and NFT ownership on The Graph (network `chapel`). |
+| Cache server | Node + PostgreSQL. Copies subgraph changes into our own database every 15 s and serves them as a JSON API for the Explorer tab. |
 
 ---
 
@@ -38,9 +39,11 @@ A minimal decentralized exchange on **BNB Smart Chain testnet**: a constant-prod
 │   ├── src/                 SunWoo42.sol, tokenB.sol, AMM.sol, TokenizeArt.sol
 │   ├── test/                AMM.t.sol (6 tests), NFTMarket.t.sol (8 tests)
 │   ├── script/Deploy.s.sol  deploys everything, seeds the pool, writes deployment/<chainId>.json
-│   └── subgraph/            The Graph subgraph (schema, manifest, mappings)
+│   ├── subgraph/            The Graph subgraph (schema, manifest, mappings)
+│   └── cache-server/        subgraph → PostgreSQL sync + JSON API for the Explorer tab
 ├── frontend/                Vite + React + wagmi app
 ├── deployment/              deployed addresses and start block per chain (31337 = local anvil, 97 = BSC testnet)
+│   └── server/              systemd unit and nginx config for the Linux server
 └── documentation/           architecture, limitations, subgraph notes, study guides
 ```
 
@@ -113,6 +116,22 @@ Example query:
 }
 ```
 
+## Cache server and Explorer tab
+
+```
+browser ─/api/…─▶ nginx ─▶ cache server (127.0.0.1:3001) ─▶ PostgreSQL (127.0.0.1:5432)
+                                  └── every 15 s: entities changed since the last block ◀── Subgraph Studio
+```
+
+```bash
+cd code/cache-server
+npm install
+echo 'DATABASE_URL=postgres://<user>:<password>@localhost:5432/<db>' > .env
+npm run dev                       # API on 127.0.0.1:3001; the frontend dev server proxies /api to it
+```
+
+API: `/api/pool`, `/api/swaps`, `/api/liquidity`, `/api/listings?status=`, `/api/nfts?owner=`. Deployment on a Linux server with nginx, systemd, ufw and fail2ban: [documentation/cache-server.md](documentation/cache-server.md).
+
 ---
 
 ## How it works (short)
@@ -123,7 +142,7 @@ Example query:
 - **Marketplace**: `listNFT` escrows the NFT in the AMM; `buyNFT` sends the payment straight from buyer to seller and the NFT to the buyer; `cancelListing` returns it. Pool reserves are never touched.
 - Pool and marketplace functions are `nonReentrant` and follow checks-effects-interactions.
 
-Details: [documentation/architecture.md](documentation/architecture.md) · Limitations: [documentation/known-limitations.md](documentation/known-limitations.md) · Subgraph: [documentation/subgraph.md](documentation/subgraph.md)
+Details: [documentation/architecture.md](documentation/architecture.md) · Limitations: [documentation/known-limitations.md](documentation/known-limitations.md) · Subgraph: [documentation/subgraph.md](documentation/subgraph.md) · Cache server: [documentation/cache-server.md](documentation/cache-server.md)
 
 ## Tests
 

@@ -9,8 +9,9 @@
 | AMM 풀 | `x · y = k`로 SW42 ⇄ R2B 교환, 유동성 공급(LP 토큰 발행), 전액 또는 일부 회수. 수수료 3% |
 | NFT 마켓 | ERC-721을 SW42 또는 R2B 고정가로 등록, 취소, 구매. 판매 중인 NFT는 AMM 컨트랙트가 보관(escrow). 풀과 독립 |
 | 테스트 토큰 | 누구나 쓸 수 있는 `faucet()`이 있는 ERC-20 두 개 (주소당 하루 1000개) |
-| 프론트엔드 | Vite + React + wagmi. MetaMask 연결, 잔액, swap, 유동성 공급/회수, NFT 등록과 구매 |
+| 프론트엔드 | Vite + React + wagmi. Trade 탭: MetaMask 연결, 잔액, swap, 유동성 공급/회수, NFT 등록과 구매. Explorer 탭: 풀 통계, 기록, 판매 건, NFT 소유자 |
 | 서브그래프 | 풀 상태, swap, 유동성 기록, 판매 건, NFT 소유자를 The Graph에서 인덱싱 (네트워크 `chapel`) |
+| 캐시 서버 | Node + PostgreSQL. 15초마다 서브그래프의 변경분을 우리 DB에 복사하고, Explorer 탭에 JSON API로 제공 |
 
 ---
 
@@ -38,9 +39,11 @@
 │   ├── src/                 SunWoo42.sol, tokenB.sol, AMM.sol, TokenizeArt.sol
 │   ├── test/                AMM.t.sol (6개), NFTMarket.t.sol (8개)
 │   ├── script/Deploy.s.sol  전체 배포, 풀 초기 유동성, deployment/<chainId>.json 기록
-│   └── subgraph/            The Graph 서브그래프 (스키마, 매니페스트, 매핑)
+│   ├── subgraph/            The Graph 서브그래프 (스키마, 매니페스트, 매핑)
+│   └── cache-server/        서브그래프 → PostgreSQL 동기화 + Explorer 탭용 JSON API
 ├── frontend/                Vite + React + wagmi 앱
 ├── deployment/              체인별 배포 주소와 시작 블록 (31337 = 로컬 anvil, 97 = BSC 테스트넷)
+│   └── server/              리눅스 서버용 systemd 유닛과 nginx 설정
 └── documentation/           구조 설명, 한계, 서브그래프 노트, 학습 가이드
 ```
 
@@ -113,6 +116,22 @@ npx graph deploy <서브그래프-slug>
 }
 ```
 
+## 캐시 서버와 Explorer 탭
+
+```
+브라우저 ─/api/…─▶ nginx ─▶ 캐시 서버 (127.0.0.1:3001) ─▶ PostgreSQL (127.0.0.1:5432)
+                                 └── 15초마다: 마지막 블록 이후 바뀐 엔티티 ◀── Subgraph Studio
+```
+
+```bash
+cd code/cache-server
+npm install
+echo 'DATABASE_URL=postgres://<계정>:<비밀번호>@localhost:5432/<DB>' > .env
+npm run dev                       # 127.0.0.1:3001. 프론트 개발 서버가 /api를 여기로 넘김
+```
+
+API: `/api/pool`, `/api/swaps`, `/api/liquidity`, `/api/listings?status=`, `/api/nfts?owner=`. nginx, systemd, ufw, fail2ban으로 리눅스 서버에 배포하는 방법: [documentation/cache-server.ko.md](documentation/cache-server.ko.md)
+
 ---
 
 ## 동작 원리 (요약)
@@ -123,7 +142,7 @@ npx graph deploy <서브그래프-slug>
 - **마켓**: `listNFT`가 NFT를 AMM에 맡기고, `buyNFT`는 대금을 구매자에게서 판매자에게 바로 보내고 NFT를 구매자에게 넘기며, `cancelListing`은 NFT를 돌려줍니다. 풀 reserve는 건드리지 않습니다.
 - 풀과 마켓 함수는 모두 `nonReentrant`이고 checks-effects-interactions 순서를 따릅니다.
 
-자세히: [documentation/architecture.ko.md](documentation/architecture.ko.md) · 한계: [documentation/known-limitations.ko.md](documentation/known-limitations.ko.md) · 서브그래프: [documentation/subgraph.ko.md](documentation/subgraph.ko.md)
+자세히: [documentation/architecture.ko.md](documentation/architecture.ko.md) · 한계: [documentation/known-limitations.ko.md](documentation/known-limitations.ko.md) · 서브그래프: [documentation/subgraph.ko.md](documentation/subgraph.ko.md) · 캐시 서버: [documentation/cache-server.ko.md](documentation/cache-server.ko.md)
 
 ## 테스트
 

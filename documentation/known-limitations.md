@@ -46,7 +46,7 @@ TokenZswap is a learning project deployed on testnets. The points below are know
 | Only per-token approval is checked | `ListNFTForm` reads `getApproved`, so a user who used `setApprovalForAll` still sees an Approve button | Also read `isApprovedForAll` |
 | Long error messages | viem's full `error.message` is displayed | Show `shortMessage` |
 | Exact-amount approvals | Every swap / deposit / purchase needs a fresh approve (safer, but one extra popup) | Optional "approve max" toggle |
-| Subgraph not used yet | The UI reads everything from the chain directly | Switch list views to GraphQL |
+| Trade tab still reads the chain | The Explorer tab uses the indexed data (via the cache server), but the Trade tab's "My NFTs" and market list still scan the contract | Read them from `/api/nfts?owner=` and `/api/listings?status=ACTIVE` |
 
 ## Deployment and operations
 
@@ -55,3 +55,4 @@ TokenZswap is a learning project deployed on testnets. The points below are know
 | Not upgradeable | Bugs require a redeploy and new addresses (frontend, subgraph and liquidity must be updated) |
 | Testnet only | BSC testnet (chain 97) is deployed. Sepolia is configured in the frontend and Foundry but not deployed |
 | Contracts not verified on BscScan | Source code is not published on the explorer yet (`forge verify-contract` with an API key) |
+| Web server limitations | HTTP only, Studio dependency, 20-row lists: see [cache-server.md](cache-server.md#limitations) |
